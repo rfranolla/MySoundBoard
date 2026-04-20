@@ -103,22 +103,40 @@ namespace MySoundBoard
 
         private void SaveMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            // Serialize the grid
             var jArray = new JsonArray();
 
-            foreach (var button in SoundBoardGrid.Items) 
+            foreach (var button in SoundBoardGrid.Items)
             {
                 if (button is SoundBoardButton soundBoardButton)
                 {
-                    var jObj = soundBoardButton.Serialize();
-
-                    jArray.Add(jObj);
+                    jArray.Add(soundBoardButton.Serialize());
                 }
             }
 
-            var json = jArray.ToString();
-            var path = $"{AppDomain.CurrentDomain.BaseDirectory}/{SoundBoardsDir}/{SoundBoardTitle.Text}.json";
-            File.WriteAllText(path, json);
+            var boardName = SoundBoardTitle.Text;
+            var path = $"{AppDomain.CurrentDomain.BaseDirectory}{SoundBoardsDir}/{boardName}.json";
+            File.WriteAllText(path, jArray.ToString());
+
+            var file = new FileInfo(path);
+            AddLoadMenuEntry(file);
+        }
+
+        private void AddLoadMenuEntry(FileInfo file)
+        {
+            var boardName = file.Name.Split(".")[0];
+            foreach (MenuItem existing in LoadMenuItem.Items)
+            {
+                if (existing.Header?.ToString() == boardName)
+                    return;
+            }
+
+            var menuItem = new MenuItem()
+            {
+                Header = boardName,
+                DataContext = file,
+            };
+            menuItem.Click += LoadMenuItem_Click;
+            LoadMenuItem.Items.Add(menuItem);
         }
 
         private void LoadMenuItem_Click(object sender, RoutedEventArgs e)
@@ -186,6 +204,12 @@ namespace MySoundBoard
         private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             Volume = (float)VolumeSlider.Value;
+            var normalizedVolume = Volume / 100;
+            foreach (var item in SoundBoardGrid.Items)
+            {
+                if (item is SoundBoardButton button)
+                    button.UpdateVolume(normalizedVolume);
+            }
         }
     }
 }

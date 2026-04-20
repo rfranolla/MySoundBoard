@@ -37,11 +37,7 @@ namespace MySoundBoard.Managers
         public float Volume
         {
             get => _volume;
-            set
-            {
-                _volume = value;
-                Initialize();
-            }
+            set => _volume = value;
         }
 
 

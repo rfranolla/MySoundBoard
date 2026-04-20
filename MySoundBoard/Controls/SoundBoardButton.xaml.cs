@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Wpf.Ui.Controls;
 using Button = Wpf.Ui.Controls.Button;
 using TextBox = Wpf.Ui.Controls.TextBox;
@@ -32,6 +33,10 @@ namespace MySoundBoard.Controls
 
         private AudioPlayer _audioPlayer;
         private AudioPlayer _headphonePlayer;
+
+        private SymbolRegular _customPlayIcon = SymbolRegular.Play48;
+
+        private DispatcherTimer _progressTimer;
 
         private Brush _unselectedBrush;
         private Brush _unselectedBrushHover;
@@ -68,6 +73,9 @@ namespace MySoundBoard.Controls
             HeadPhoneButton.MouseOverBackground = PlayThroughHeadphones ? Brushes.DarkBlue : _unselectedBrushHover;
 
             MainWindow.Instance.ThemeChanged += ThemeChanged_Event;
+
+            _progressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            _progressTimer.Tick += ProgressTimer_Tick;
         }
 
         private void ThemeChanged_Event(object? sender, RoutedEventArgs e)
@@ -125,6 +133,7 @@ namespace MySoundBoard.Controls
                         _headphonePlayer.TogglePlayPause(MainWindow.Instance.Volume / 100);
 
                     PlayButton.Icon = new SymbolIcon() { Symbol = SymbolRegular.Pause48 };
+                    ResetAndStartProgressTimer();
                 }
                 catch (Exception ex)
                 {
@@ -156,6 +165,25 @@ namespace MySoundBoard.Controls
             _headphonePlayer?.SetVolume(volume);
         }
 
+        private void ProgressTimer_Tick(object sender, EventArgs e)
+        {
+            if (_audioPlayer == null || CurrentTrackLenght <= 0) return;
+            double progress = Math.Clamp(_audioPlayer.GetPositionInSeconds() / CurrentTrackLenght, 0, 1);
+            PlaybackFillRect.Width = progress * PlayButton.ActualWidth;
+        }
+
+        private void ResetAndStartProgressTimer()
+        {
+            PlaybackFillRect.Width = 0;
+            _progressTimer.Start();
+        }
+
+        private void StopProgressTimer()
+        {
+            _progressTimer.Stop();
+            PlaybackFillRect.Width = 0;
+        }
+
         private void EditButton_Click(object sender, RoutedEventArgs e)
         {
             Debug.WriteLine("EditButton Click");
@@ -176,6 +204,18 @@ namespace MySoundBoard.Controls
                     soundFile = openFileDialog.FileName;
                 }
             }
+        }
+
+        private void IconEditButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new IconPickerDialog(
+                _customPlayIcon,
+                preview => Dispatcher.Invoke(() =>
+                    PlayButton.Icon = new SymbolIcon { Symbol = preview }));
+
+            dialog.Owner = System.Windows.Window.GetWindow(this);
+            if (dialog.ShowDialog() == true && dialog.SelectedSymbol.HasValue)
+                _customPlayIcon = dialog.SelectedSymbol.Value;
         }
 
         private void LoopButton_Click(object sender, RoutedEventArgs e)
@@ -206,10 +246,14 @@ namespace MySoundBoard.Controls
             Dispatcher.Invoke(() =>
             {
                 _playbackState = PlaybackState.Stopped;
-                PlayButton.Icon = new SymbolIcon() { Symbol = SymbolRegular.Play48 };
+                PlayButton.Icon = new SymbolIcon() { Symbol = _customPlayIcon };
                 if (_audioPlayer.PlaybackStopType == AudioPlayer.PlaybackStopTypes.PlaybackStoppedReachingEndOfFile && LoopSound)
                 {
                     StartPlaying();
+                }
+                else
+                {
+                    StopProgressTimer();
                 }
             });
         }
@@ -225,6 +269,7 @@ namespace MySoundBoard.Controls
             {
                 _playbackState = PlaybackState.Playing;
                 PlayButton.Icon = new SymbolIcon() { Symbol = SymbolRegular.Pause48 };
+                _progressTimer.Start();
             });
         }
 
@@ -233,7 +278,8 @@ namespace MySoundBoard.Controls
             Dispatcher.Invoke(() =>
             {
                 _playbackState = PlaybackState.Paused;
-                PlayButton.Icon = new SymbolIcon() { Symbol = SymbolRegular.Play48 };
+                PlayButton.Icon = new SymbolIcon() { Symbol = _customPlayIcon };
+                _progressTimer.Stop();
             });
         }
 
@@ -247,6 +293,7 @@ namespace MySoundBoard.Controls
             jObj.Add("PlayThroughHeadphones", PlayThroughHeadphones);
             jObj.Add("soundFile", soundFile);
             jObj.Add("Title", Title);
+            jObj.Add("CustomPlayIcon", _customPlayIcon.ToString());
 
             return jObj;
         }
@@ -278,6 +325,15 @@ namespace MySoundBoard.Controls
             {
                 Title = nodeValue.GetValue<string>();
                 this.title.Text = Title;
+            }
+
+            if (jObj.TryGetPropertyValue("CustomPlayIcon", out nodeValue) && nodeValue != null)
+            {
+                if (Enum.TryParse<SymbolRegular>(nodeValue.GetValue<string>(), out var icon))
+                {
+                    _customPlayIcon = icon;
+                    PlayButton.Icon = new SymbolIcon { Symbol = _customPlayIcon };
+                }
             }
         }
 

@@ -20,11 +20,30 @@
                 <RowDefinition Height="3*"/>
                 <RowDefinition Height="1*"/>
             </Grid.RowDefinitions>
-            <ui:TextBox x:Name="title" HorizontalAlignment="Left" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="4" 
-                        Padding="0" Margin="0" MinWidth="144" Width="144" Height="20" VerticalAlignment="Top"
-                        TextChanged="title_TextChanged"/>
-            <ui:Button x:Name="PlayButton" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4" Icon="{ui:SymbolIcon Play48}" FontSize="80"
-                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1,0,1,1" Click="PlayButton_Click"/>
+            <Grid Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="4" Height="20" VerticalAlignment="Top">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ui:TextBox x:Name="title" Grid.Column="0" Padding="0" Margin="0" Height="20"
+                            HorizontalAlignment="Stretch" VerticalAlignment="Top"
+                            TextChanged="title_TextChanged"/>
+                <ui:Button x:Name="IconEditButton" Grid.Column="1" Icon="{ui:SymbolIcon Edit20}" Padding="0"
+                           Width="20" Height="20" Margin="1,0,0,0" VerticalAlignment="Top"
+                           ToolTip="Change play button icon" Click="IconEditButton_Click"/>
+            </Grid>
+            <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4" Margin="1,0,1,1">
+                <ui:Button x:Name="PlayButton" Icon="{ui:SymbolIcon Play48}" FontSize="80"
+                           HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                           Click="PlayButton_Click"/>
+                <Rectangle x:Name="PlaybackFillRect"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Stretch"
+                           Width="0"
+                           IsHitTestVisible="False"
+                           Fill="Black"
+                           Opacity="0.25"/>
+            </Grid>
 
             <ui:Button x:Name="EditButton" Grid.Row="2" Grid.Column="0" Icon="{ui:SymbolIcon Edit20}" Padding="0"
                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1" Click="EditButton_Click"/>

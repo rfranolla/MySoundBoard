@@ -3,11 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:MySoundBoard"
         mc:Ignorable="d"
         Title="MainWindow" Height="650" Width="900"
-        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml" 
-        xmlns:controls="clr-namespace:MySoundBoard.Controls">
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

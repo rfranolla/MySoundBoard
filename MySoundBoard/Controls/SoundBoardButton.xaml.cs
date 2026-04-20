@@ -26,7 +26,7 @@ namespace MySoundBoard.Controls
         private PlaybackState _playbackState;
 
         private bool LoopSound = false;
-        private bool PlayThroughHeadphones = true;
+        private bool PlayThroughHeadphones = false;
 
         private string soundFile = string.Empty;
 
@@ -100,22 +100,28 @@ namespace MySoundBoard.Controls
             {
                 try
                 {
-                    _audioPlayer = new AudioPlayer(soundFile, MainWindow.Instance.Volume / 100, MainWindow.GetSelectedOutputDevice());
+                    var outputDevice = MainWindow.GetSelectedOutputDevice();
+                    var headphoneDevice = MainWindow.GetSelectedHeadphoneDevice();
+                    bool useDualOutput = PlayThroughHeadphones
+                        && headphoneDevice != null
+                        && headphoneDevice.Guid != outputDevice?.Guid;
+
+                    _audioPlayer = new AudioPlayer(soundFile, MainWindow.Instance.Volume / 100, outputDevice);
                     _audioPlayer.PlaybackStopType = AudioPlayer.PlaybackStopTypes.PlaybackStoppedReachingEndOfFile;
                     _audioPlayer.PlaybackPaused += _audioPlayer_PlaybackPaused;
                     _audioPlayer.PlaybackResumed += _audioPlayer_PlaybackResumed;
                     _audioPlayer.PlaybackStopped += _audioPlayer_PlaybackStopped;
                     CurrentTrackLenght = _audioPlayer.GetLenghtInSeconds();
 
-                    if (PlayThroughHeadphones)
+                    if (useDualOutput)
                     {
-                        _headphonePlayer = new AudioPlayer(soundFile, MainWindow.Instance.Volume / 100, MainWindow.GetSelectedHeadphoneDevice());
+                        _headphonePlayer = new AudioPlayer(soundFile, MainWindow.Instance.Volume / 100, headphoneDevice);
                         _headphonePlayer.PlaybackStopType = AudioPlayer.PlaybackStopTypes.PlaybackStoppedReachingEndOfFile;
                         _headphonePlayer.PlaybackStopped += _headphonePlayer_PlaybackStopped;
                     }
 
                     _audioPlayer.TogglePlayPause(MainWindow.Instance.Volume / 100);
-                    if (PlayThroughHeadphones)
+                    if (useDualOutput)
                         _headphonePlayer.TogglePlayPause(MainWindow.Instance.Volume / 100);
 
                     PlayButton.Icon = new SymbolIcon() { Symbol = SymbolRegular.Pause48 };

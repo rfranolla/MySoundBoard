@@ -43,12 +43,12 @@
                 <ColumnDefinition/>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Margin="5,0">
-                <ui:TextBlock Margin="0,5">Virtual Output (Virtual Cable)</ui:TextBlock>
-                <ComboBox x:Name="OutputDevice"></ComboBox>
+                <ui:TextBlock Margin="0,5">Primary Output</ui:TextBlock>
+                <ComboBox x:Name="OutputDevice" ToolTip="Primary audio output — plays on your speakers or headset"/>
             </StackPanel>
             <StackPanel Grid.Column="1" Margin="5,0">
-                <ui:TextBlock Margin="0,5">Headphone Output (Your Speaker)</ui:TextBlock>
-                <ComboBox x:Name="HeadphoneDevice"></ComboBox>
+                <ui:TextBlock Margin="0,5">Secondary Output (mic routing)</ui:TextBlock>
+                <ComboBox x:Name="HeadphoneDevice" ToolTip="Secondary output for mic routing. Select a virtual audio device (e.g. VB-Audio Cable Input) to have Discord or streaming software hear these sounds. Leave on the same device as Primary if not using mic routing."/>
             </StackPanel>
         </Grid>
     </Grid>

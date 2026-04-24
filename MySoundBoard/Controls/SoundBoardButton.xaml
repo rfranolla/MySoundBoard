@@ -28,7 +28,7 @@
                 <ui:TextBox x:Name="title" Grid.Column="0" Padding="0" Margin="0" Height="20"
                             HorizontalAlignment="Stretch" VerticalAlignment="Top"
                             TextChanged="title_TextChanged"/>
-                <ui:Button x:Name="IconEditButton" Grid.Column="1" Icon="{ui:SymbolIcon Edit20}" Padding="0"
+                <ui:Button x:Name="IconEditButton" Grid.Column="1" Icon="{ui:SymbolIcon EmojiSmileSlight24}" Padding="0"
                            Width="20" Height="20" Margin="1,0,0,0" VerticalAlignment="Top"
                            ToolTip="Change play button icon" Click="IconEditButton_Click"/>
             </Grid>

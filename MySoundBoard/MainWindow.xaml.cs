@@ -16,6 +16,8 @@ namespace MySoundBoard
     {
         private AddButton _addButton;
         private const string SoundBoardsDir = "SoundBoards";
+        private static string AppDataDir =>
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MySoundBoard");
         public EventHandler<RoutedEventArgs> ThemeChanged;
         public float Volume = 1.0f;
 
@@ -53,7 +55,7 @@ namespace MySoundBoard
 
         private void InitializeLoadMenu()
         {
-            var dirPath = $"{AppDomain.CurrentDomain.BaseDirectory}{SoundBoardsDir}";
+            var dirPath = Path.Combine(AppDataDir, SoundBoardsDir);
             if (!Directory.Exists(dirPath))
             {
                 Directory.CreateDirectory(dirPath);
@@ -114,7 +116,7 @@ namespace MySoundBoard
             }
 
             var boardName = SoundBoardTitle.Text;
-            var path = $"{AppDomain.CurrentDomain.BaseDirectory}{SoundBoardsDir}/{boardName}.json";
+            var path = Path.Combine(AppDataDir, SoundBoardsDir, $"{boardName}.json");
             File.WriteAllText(path, jArray.ToString());
 
             var file = new FileInfo(path);

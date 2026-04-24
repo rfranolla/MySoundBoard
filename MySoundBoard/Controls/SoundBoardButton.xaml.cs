@@ -268,7 +268,7 @@ namespace MySoundBoard.Controls
             Dispatcher.Invoke(() =>
             {
                 _playbackState = PlaybackState.Playing;
-                PlayButton.Icon = new SymbolIcon() { Symbol = SymbolRegular.Pause48 };
+                PlayButton.Icon = new SymbolIcon() { Symbol = SymbolRegular.Stop24 };
                 _progressTimer.Start();
             });
         }

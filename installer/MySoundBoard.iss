@@ -52,11 +52,11 @@ Name: "{autodesktop}\{#MyAppName}";       Filename: "{app}\{#MyAppExeName}"; Ico
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-// Check for .NET 8 Desktop Runtime by looking for its shared framework registry key.
+// Check for .NET 8 Desktop Runtime by looking for the System.Windows.Forms.dll file
+// in the shared framework directory. This is more reliable than registry checks.
 function IsDotNetDesktopRuntimeInstalled: Boolean;
 begin
-  Result := RegKeyExists(HKLM,
-    'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App');
+  Result := FileExists(ExpandConstant('{pf}\dotnet\shared\Microsoft.WindowsDesktop.App\8.0.0\') + 'System.Windows.Forms.dll');
 end;
 
 // Before the wizard starts, offer to download and install the runtime if missing.

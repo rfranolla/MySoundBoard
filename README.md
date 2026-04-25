@@ -40,14 +40,14 @@ A Windows soundboard application built with WPF (.NET 8) that lets you trigger a
 ## Requirements
 
 - Windows 10 or 11
-- .NET 8 Runtime (Desktop)
+- [.NET 8 Runtime (Desktop)](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.26-windows-x64-installer)
 
 ---
 
 ## Getting Started
 
 1. Run `MySoundBoard-Setup-1.0.0.exe` from the releases to install the app.
-2. On first launch the app creates a `SoundBoards/` folder next to the executable where your saved layouts are stored.
+2. On first launch the app creates a `%APPDATA%\MySoundBoard\SoundBoards\` folder where your saved layouts are stored.
 
 ---
 

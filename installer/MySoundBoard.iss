@@ -55,8 +55,29 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 // Check for .NET 8 Desktop Runtime by looking for the System.Windows.Forms.dll file
 // in the shared framework directory. This is more reliable than registry checks.
 function IsDotNetDesktopRuntimeInstalled: Boolean;
+var
+  FindRec: TFindRec;
+  BasePath: String;
 begin
-  Result := FileExists(ExpandConstant('{pf}\dotnet\shared\Microsoft.WindowsDesktop.App\8.0.0\') + 'System.Windows.Forms.dll');
+  Result := False;
+  BasePath := ExpandConstant('{pf}\dotnet\shared\Microsoft.WindowsDesktop.App\');
+  
+  // Search for any 8.x.x version directory
+  if FindFirst(BasePath + '8.*', FindRec) then
+  try
+    repeat
+      if (FindRec.Attributes and $10 <> 0) then  // Check if it's a directory
+      begin
+        if FileExists(BasePath + FindRec.Name + '\System.Windows.Forms.dll') then
+        begin
+          Result := True;
+          Break;
+        end;
+      end;
+    until not FindNext(FindRec);
+  finally
+    FindClose(FindRec);
+  end;
 end;
 
 // Before the wizard starts, offer to download and install the runtime if missing.

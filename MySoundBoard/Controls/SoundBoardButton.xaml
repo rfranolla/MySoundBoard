@@ -1,13 +1,31 @@
-﻿<UserControl x:Class="MySoundBoard.Controls.SoundBoardButton"
+<UserControl x:Class="MySoundBoard.Controls.SoundBoardButton"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:MySoundBoard.Controls"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-             mc:Ignorable="d" 
-             d:DesignHeight="150" d:DesignWidth="150">
-    <Border Width="150" Height="150" BorderThickness="1" BorderBrush="LightGray" Padding="2" CornerRadius="4">
+             mc:Ignorable="d"
+             d:DesignHeight="160" d:DesignWidth="150">
+    <Border x:Name="RootBorder" Width="150" Height="160" BorderThickness="1" BorderBrush="LightGray"
+            Padding="2" CornerRadius="4" AllowDrop="True"
+            PreviewMouseLeftButtonDown="RootBorder_PreviewMouseLeftButtonDown"
+            MouseMove="RootBorder_MouseMove"
+            DragEnter="RootBorder_DragEnter"
+            DragLeave="RootBorder_DragLeave"
+            Drop="RootBorder_Drop">
+        <Border.ContextMenu>
+            <ContextMenu>
+                <MenuItem Header="Rename"          Click="RenameMenuItem_Click"/>
+                <MenuItem Header="Set Color"        Click="SetColorMenuItem_Click"/>
+                <MenuItem Header="Set Hotkey"       Click="SetHotkeyMenuItem_Click"/>
+                <MenuItem Header="Fade In / Out"    Click="FadeMenuItem_Click"/>
+                <MenuItem Header="Auto-Stop Timer"  Click="AutoStopMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="Duplicate"        Click="DuplicateMenuItem_Click"/>
+                <MenuItem Header="Delete"           Click="DeleteButton_Click"/>
+            </ContextMenu>
+        </Border.ContextMenu>
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition/>
@@ -18,9 +36,12 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="1*"/>
                 <RowDefinition Height="3*"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="1*"/>
             </Grid.RowDefinitions>
-            <Grid Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="4" Height="20" VerticalAlignment="Top">
+
+            <!-- Title row -->
+            <Grid Grid.Row="0" Grid.ColumnSpan="4" Height="20" VerticalAlignment="Top">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -32,28 +53,43 @@
                            Width="20" Height="20" Margin="1,0,0,0" VerticalAlignment="Top"
                            ToolTip="Change play button icon" Click="IconEditButton_Click"/>
             </Grid>
-            <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4" Margin="1,0,1,1">
+
+            <!-- Play button + progress + hotkey badge -->
+            <Grid Grid.Row="1" Grid.ColumnSpan="4" Margin="1,0,1,0">
                 <ui:Button x:Name="PlayButton" Icon="{ui:SymbolIcon Play48}" FontSize="80"
                            HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                            Click="PlayButton_Click"/>
                 <Rectangle x:Name="PlaybackFillRect"
-                           HorizontalAlignment="Left"
-                           VerticalAlignment="Stretch"
-                           Width="0"
-                           IsHitTestVisible="False"
-                           Fill="Black"
-                           Opacity="0.25"/>
+                           HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                           Width="0" IsHitTestVisible="False"
+                           Fill="Black" Opacity="0.25"/>
+                <Border x:Name="HotkeyBadge"
+                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Background="#99000000" CornerRadius="2" Padding="2,0"
+                        Margin="0,2,2,0" IsHitTestVisible="False"
+                        Visibility="Collapsed">
+                    <TextBlock x:Name="HotkeyBadgeText" FontSize="9" Foreground="White"/>
+                </Border>
             </Grid>
 
-            <ui:Button x:Name="EditButton" Grid.Row="2" Grid.Column="0" Icon="{ui:SymbolIcon Edit20}" Padding="0"
+            <!-- Per-button volume slider -->
+            <Slider x:Name="ButtonVolumeSlider"
+                    Grid.Row="2" Grid.ColumnSpan="4"
+                    Minimum="0" Maximum="1" Value="1"
+                    Margin="4,1,4,1" Height="14"
+                    ToolTip="Button volume"
+                    ValueChanged="ButtonVolumeSlider_ValueChanged"/>
+
+            <!-- Action buttons -->
+            <ui:Button x:Name="EditButton" Grid.Row="3" Grid.Column="0" Icon="{ui:SymbolIcon Edit20}" Padding="0"
                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1" Click="EditButton_Click"/>
-            <ui:Button x:Name="LoopButton" Grid.Row="2" Grid.Column="1" Icon="{ui:SymbolIcon arrowRepeatAll20}" Padding="0"
-                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1" Click="LoopButton_Click">
-            </ui:Button>
-            <ui:Button x:Name="HeadPhoneButton" Grid.Row="2" Grid.Column="2" Icon="{ui:SymbolIcon HeadphonesSoundWave20}" Padding="0"
+            <ui:Button x:Name="LoopButton" Grid.Row="3" Grid.Column="1" Icon="{ui:SymbolIcon arrowRepeatAll20}" Padding="0"
+                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1" Click="LoopButton_Click"/>
+            <ui:Button x:Name="HeadPhoneButton" Grid.Row="3" Grid.Column="2" Icon="{ui:SymbolIcon HeadphonesSoundWave20}" Padding="0"
                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1" Click="HeadphoneButton_Click"/>
-            <ui:Button x:Name="DeleteButton" Grid.Row="2" Grid.Column="3" Icon="{ui:SymbolIcon Symbol=Delete20}" Padding="0"
-                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1" Click="DeleteButton_Click" Background="#AAFF0000" MouseOverBackground="#44FF0000"/>
+            <ui:Button x:Name="DeleteButton" Grid.Row="3" Grid.Column="3" Icon="{ui:SymbolIcon Symbol=Delete20}" Padding="0"
+                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1"
+                       Click="DeleteButton_Click" Background="#AAFF0000" MouseOverBackground="#44FF0000"/>
         </Grid>
     </Border>
 </UserControl>

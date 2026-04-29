@@ -1,4 +1,6 @@
-﻿using NAudio.Wave;
+using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
+using System.IO;
 
 namespace MySoundBoard.Managers
 {
@@ -11,35 +13,23 @@ namespace MySoundBoard.Managers
 
         public PlaybackStopTypes PlaybackStopType { get; set; }
 
-        private AudioFileReader _audioFileReader;
-
-        private DirectSoundOut _output;
-
-        private DirectSoundDeviceInfo _deviceInfo;
-
-        private string _filepath;
+        private WaveStream? _reader;
+        private VolumeSampleProvider? _volumeProvider;
+        private FadeInOutSampleProvider? _fadeProvider;
+        private DirectSoundOut? _output;
+        private readonly DirectSoundDeviceInfo _deviceInfo;
+        private readonly string _filepath;
         private float _volume = 1.0f;
 
-        public event Action PlaybackResumed;
-        public event Action PlaybackStopped;
-        public event Action PlaybackPaused;
-
-        public string FilePath
-        {
-            get => _filepath;
-            set
-            {
-                _filepath = value;
-                Initialize();
-            }
-        }
+        public event Action? PlaybackResumed;
+        public event Action? PlaybackStopped;
+        public event Action? PlaybackPaused;
 
         public float Volume
         {
             get => _volume;
             set => _volume = value;
         }
-
 
         public AudioPlayer(string filepath, float volume, DirectSoundDeviceInfo deviceInfo)
         {
@@ -50,77 +40,65 @@ namespace MySoundBoard.Managers
             Initialize();
         }
 
-        public AudioPlayer()
+        private static WaveStream CreateReader(string filepath)
         {
-            PlaybackStopType = PlaybackStopTypes.PlaybackStoppedReachingEndOfFile;
+            var ext = Path.GetExtension(filepath).ToLowerInvariant();
+            if (ext == ".ogg")
+            {
+                // NAudio.Vorbis.VorbisWaveReader — loaded via reflection so the build doesn't fail
+                // if the package is absent; callers should ensure NAudio.Vorbis is installed.
+                var type = Type.GetType("NAudio.Vorbis.VorbisWaveReader, NAudio.Vorbis");
+                if (type != null)
+                    return (WaveStream)Activator.CreateInstance(type, filepath)!;
+            }
+            return new AudioFileReader(filepath);
         }
 
         private void Initialize()
         {
-            if (_audioFileReader != null) 
-            {
-                _audioFileReader.Dispose();
-                _audioFileReader = null;
-            }
-            _audioFileReader = new AudioFileReader(_filepath) { Volume = _volume };
+            _reader?.Dispose();
+            _reader = CreateReader(_filepath);
 
-            if (_output != null)
-            {
-                _output.Dispose();
-                _output = null;
-            }
+            ISampleProvider source = _reader.ToSampleProvider();
+            _volumeProvider = new VolumeSampleProvider(source) { Volume = _volume };
+            _fadeProvider = new FadeInOutSampleProvider(_volumeProvider, initiallySilent: false);
+
+            _output?.Dispose();
             _output = new DirectSoundOut(_deviceInfo.Guid, 200);
-            _output.PlaybackStopped += _output_PlaybackStopped;
-
-            var wc = new WaveChannel32(_audioFileReader);
-            wc.PadWithZeroes = false;
-
-            _output.Init(wc);
+            _output.PlaybackStopped += Output_PlaybackStopped;
+            _output.Init(new SampleToWaveProvider(_fadeProvider));
         }
+
+        public void BeginFadeIn(double durationMs)
+            => _fadeProvider?.BeginFadeIn(durationMs);
+
+        public void BeginFadeOut(double durationMs)
+            => _fadeProvider?.BeginFadeOut(durationMs);
 
         public void Play(PlaybackState playbackState, double currentVolumeLevel)
         {
             if (playbackState == PlaybackState.Stopped || playbackState == PlaybackState.Paused)
-            {
-                _output.Play();
-            }
+                _output?.Play();
 
-            _audioFileReader.Volume = (float)currentVolumeLevel;
+            if (_volumeProvider != null)
+                _volumeProvider.Volume = (float)currentVolumeLevel;
 
-            if (PlaybackResumed != null)
-            {
-                PlaybackResumed();
-            }
+            PlaybackResumed?.Invoke();
         }
 
-        private void _output_PlaybackStopped(object sender, StoppedEventArgs e)
+        private void Output_PlaybackStopped(object? sender, StoppedEventArgs e)
         {
             Dispose();
-            if (PlaybackStopped != null)
-            {
-                PlaybackStopped();
-            }
+            PlaybackStopped?.Invoke();
         }
 
-        public void Stop()
-        {
-            if (_output != null)
-            {
-                _output.Stop();
-            }
-        }
+        public void Stop() => _output?.Stop();
 
         public void Pause()
         {
-            if (_output != null)
-            {
-                _output.Pause();
-
-                if (PlaybackPaused != null)
-                {
-                    PlaybackPaused();
-                }
-            }
+            if (_output == null) return;
+            _output.Pause();
+            PlaybackPaused?.Invoke();
         }
 
         public void TogglePlayPause(double currentVolumeLevel)
@@ -128,13 +106,9 @@ namespace MySoundBoard.Managers
             if (_output != null)
             {
                 if (_output.PlaybackState == PlaybackState.Playing)
-                {
                     Pause();
-                }
                 else
-                {
                     Play(_output.PlaybackState, currentVolumeLevel);
-                }
             }
             else
             {
@@ -147,59 +121,31 @@ namespace MySoundBoard.Managers
             if (_output != null)
             {
                 if (_output.PlaybackState == PlaybackState.Playing)
-                {
                     _output.Stop();
-                }
                 _output.Dispose();
                 _output = null;
             }
-            if (_audioFileReader != null)
-            {
-                _audioFileReader.Dispose();
-                _audioFileReader = null;
-            }
+            _reader?.Dispose();
+            _reader = null;
         }
 
-        public double GetLenghtInSeconds()
-        {
-            if (_audioFileReader != null)
-            {
-                return _audioFileReader.TotalTime.TotalSeconds;
-            }
-            else
-            {
-                return 0;
-            }
-        }
+        public double GetLenghtInSeconds() => _reader?.TotalTime.TotalSeconds ?? 0;
 
-        public double GetPositionInSeconds()
-        {
-            return _audioFileReader != null ? _audioFileReader.CurrentTime.TotalSeconds : 0;
-        }
+        public double GetPositionInSeconds() => _reader?.CurrentTime.TotalSeconds ?? 0;
 
-        public float GetVolume()
-        {
-            if (_audioFileReader != null)
-            {
-                return _audioFileReader.Volume;
-            }
-            return 1;
-        }
+        public float GetVolume() => _volumeProvider?.Volume ?? 1f;
 
         public void SetPosition(double value)
         {
-            if (_audioFileReader != null)
-            {
-                _audioFileReader.CurrentTime = TimeSpan.FromSeconds(value);
-            }
+            if (_reader != null)
+                _reader.CurrentTime = TimeSpan.FromSeconds(value);
         }
 
         public void SetVolume(float value)
         {
-            if (_output != null)
-            {
-                _audioFileReader.Volume = value;
-            }
+            _volume = value;
+            if (_volumeProvider != null)
+                _volumeProvider.Volume = value;
         }
     }
 }

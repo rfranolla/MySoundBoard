@@ -24,13 +24,23 @@ A Windows soundboard application built with WPF (.NET 8) that lets you trigger a
 
 ## Features
 
-- Trigger audio clips (MP3, WAV) from a grid of customizable buttons
+- Trigger audio clips (MP3, WAV, OGG) from a grid of customizable buttons
 - Play, pause, and stop individual sounds independently
 - Loop any sound continuously until manually stopped
 - Dual audio output — play through speakers and a virtual mic simultaneously
+- Per-button fade in and fade out with configurable durations (0–10 s)
+- Fade toggle button — enable or disable fade per button without losing your configured durations
+- Per-button volume slider for independent level control on each tile
+- Configurable global hotkeys — assign a key combination to any button to trigger it from anywhere
+- Auto-stop timer — optionally stop a sound after a set number of seconds
+- Per-button background color for visual organization
 - Per-button custom icons chosen from a built-in icon library
+- Drag-and-drop reordering of buttons within the grid
+- Duplicate button — copy a button including all its settings
+- Search/filter bar to quickly find buttons by label
 - Global volume slider that applies in real time to all active sounds
 - Visual playback progress indicator on each button
+- System tray icon — minimize to tray; stop all sounds or exit from the tray menu
 - Save and load multiple named soundboard layouts as JSON
 - Alphabetical sort for your button grid
 - Light and Dark theme support (Windows Fluent design)
@@ -40,14 +50,35 @@ A Windows soundboard application built with WPF (.NET 8) that lets you trigger a
 ## Requirements
 
 - Windows 10 or 11
-- [.NET 8 Runtime (Desktop)](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.26-windows-x64-installer)
+- [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0) (the installer handles this automatically)
 
 ---
 
 ## Getting Started
 
-1. Run `MySoundBoard-Setup-1.0.0.exe` from the releases to install the app.
-2. On first launch the app creates a `%APPDATA%\MySoundBoard\SoundBoards\` folder where your saved layouts are stored.
+> **Security notice:** MySoundBoard is not code-signed with a certificate. Windows SmartScreen and some antivirus tools will flag the installer as unrecognized. This does **not** mean the app is malicious — it means the publisher is not verified by a certificate authority. If you are not comfortable bypassing these warnings, use the portable Option B below.
+
+### Option A — Installer (recommended)
+
+1. Download `MySoundBoard-Setup-X.X.X.exe` from the [Releases](../../releases) page.
+2. If Windows Defender SmartScreen appears with **"Windows protected your PC"**:
+   - Click **More info**
+   - Click **Run anyway**
+3. If Windows **deletes the installer file** before you can run it (common on machines with aggressive Defender settings):
+   - Open **Windows Security** → **Virus & threat protection** → **Protection history**
+   - Find the quarantined item and choose **Allow**
+   - Alternatively, use Option B to skip the installer entirely
+4. Follow the installer prompts. The app installs to `Program Files\MySoundBoard`.
+5. On first launch the app creates `%APPDATA%\MySoundBoard\SoundBoards\` where your saved layouts are stored.
+
+### Option B — Portable (no installer)
+
+1. Download `MySoundBoard-Build-X.X.X.zip` from the [Releases](../../releases) page.
+2. Extract the ZIP to any folder of your choice (e.g., `C:\Apps\MySoundBoard\`).
+3. Run `MySoundBoard.exe` directly from that folder.
+4. To create a shortcut: right-click `MySoundBoard.exe` → **Send to** → **Desktop (create shortcut)**, or drag it onto your taskbar to pin it.
+
+> **Note:** The portable build requires [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0) to be installed separately. The installer handles this automatically.
 
 ---
 
@@ -57,30 +88,47 @@ A Windows soundboard application built with WPF (.NET 8) that lets you trigger a
 
 Click the **+** button (always the last tile in the grid) to add a new blank sound button. You can add as many buttons as you need.
 
+Use the **search bar** at the top of the window to filter visible buttons by their label — useful on large boards.
+
 ### Configuring a Sound Button
 
-Each button has a row of small action icons along the top:
+Each button has a row of small action icons along the bottom:
 
 | Icon | Action |
 |------|--------|
-| Pencil (Edit) | Opens a file picker to assign an audio file (MP3 or WAV) to this button. The button label updates automatically to the file name, which you can then rename by typing in the text field below. |
+| Pencil (Edit) | Opens a file picker to assign an audio file (MP3, WAV, or OGG). The button label updates automatically to the file name, which you can rename by typing in the text field at the top of the tile. |
 | Smiley (Icon) | Opens the icon picker so you can choose a custom symbol displayed on the play button. |
-| Loop | Toggles loop mode. The button turns **blue** when looping is active. When the sound finishes it will restart automatically until you stop it manually. |
+| Loop | Toggles loop mode. The button turns **blue** when active. When the clip ends naturally it restarts automatically until you stop it manually. Enabling loop also disables the Fade button. |
+| Fade | Toggles fade in/out for this button. Turns **blue** when enabled. Configure the durations (0–10 s each) via right-click → **Fade In / Out**. Automatically disabled when Loop is on. |
 | Headphones | Toggles dual output mode for this button. The button turns **blue** when enabled. When active, the sound plays on both the **Primary Output** and the **Secondary Output** device simultaneously (see [Audio Output Devices](#audio-output-devices)). |
 | Trash (Delete) | Removes this button from the board and stops any active playback. |
 
-You can also rename a button at any time by clicking on the text label and typing a new name.
+**Right-click any button** for additional options:
+
+| Option | Description |
+|--------|-------------|
+| Rename | Focuses the title field so you can type a new name. |
+| Set Color | Applies a background tint to the tile for visual grouping. |
+| Set Hotkey | Assigns a global key combination (e.g., Ctrl+Alt+1) that triggers this button from anywhere on your desktop. |
+| Fade In / Out | Opens a slider dialog to set the fade-in and fade-out durations (0–10 s). These values are saved even when the Fade toggle is off. |
+| Auto-Stop Timer | Stops playback automatically after a set number of seconds (0–300). Useful for sounds you want to cap at a fixed length regardless of file duration. |
+| Duplicate | Creates a copy of the button with all its settings (hotkeys are stripped since they must be unique). |
+| Delete | Same as the trash icon. |
+
+You can also **drag and drop** buttons to reorder them within the grid.
 
 ### Playing Sounds
 
-- **Click the large play button (or custom icon)** in the center of a sound tile to start playback.
-- While playing, the button icon switches to a **stop** symbol and a progress bar fills across the button face showing how far through the clip you are.
+- **Click the large play button** in the center of a sound tile to start playback.
+- While playing, the button icon switches to a **stop** symbol and a progress bar fills across the button face.
 - **Click again** to stop. Click once more to restart from the beginning.
 - When a sound finishes naturally it resets to the beginning. If loop mode is on, it restarts immediately.
 
 ### Volume Control
 
-The **slider at the bottom** of the window controls the global playback volume (0–100). Moving it adjusts the volume of all currently playing sounds in real time, and the new level is applied to any sounds started afterward.
+Each button has a **thin slider directly below the play button** that controls that button's volume independently (0–100%). This multiplies with the global volume, so a button at 50% with the global at 80% plays at 40% of full volume.
+
+The **slider at the bottom of the window** controls the global playback volume (0–100%). Moving it adjusts the volume of all currently playing sounds in real time.
 
 ### Audio Output Devices
 
@@ -95,7 +143,7 @@ Both dropdowns list all DirectSound-compatible output devices detected on your s
 
 Use the **File** menu to manage soundboard layouts:
 
-- **File > Save** — saves the current board (all buttons, their assigned files, names, icons, loop state, and headphone toggle) as a JSON file in the `%APPDATA%\MySoundBoard\SoundBoards\` folder. The file is named after whatever text is in the title field at the top of the window (default: `My Soundboard`). Change the title before saving to create a new named board.
+- **File > Save** — saves the current board (all buttons, their assigned files, names, icons, colors, hotkeys, loop/fade/headphone state, and volume) as a JSON file in `%APPDATA%\MySoundBoard\SoundBoards\`. The file is named after the title field at the top of the window (default: `My Soundboard`). Change the title before saving to create a new named board.
 - **File > Load** — lists every saved `.json` board. Click one to load it, which clears the current grid and restores all buttons from the file.
 
 Soundboard JSON files can be copied between machines as long as the audio file paths are still valid on the target machine.
@@ -113,7 +161,11 @@ MySoundBoard is a WPF (.NET 8) application using the [WPF-UI](https://github.com
 
 **Audio engine** — each sound button manages its own `AudioPlayer` instance (and optionally a second one for the headphone device). `AudioPlayer` wraps NAudio's `DirectSoundOut` with an `AudioFileReader`, allowing independent control over play/pause/stop/volume per button. When dual output is enabled and the two selected devices are different, a separate `AudioPlayer` is created for the secondary device and both are started in sync.
 
+**Fade** — fade in is applied immediately on playback start via NAudio's volume ramp. Fade out is handled by a `DispatcherTimer` that fires at `trackLength - fadeOutSeconds`, triggering a volume ramp down before the clip ends. Both are suppressed when loop mode is active or when the fade toggle is off.
+
 **Progress tracking** — a `DispatcherTimer` ticks every 100 ms while a sound is playing. It reads the current playback position from `AudioFileReader.CurrentTime` and updates the width of a fill rectangle overlaid on the play button, creating a visual progress bar.
+
+**Hotkeys** — global hotkeys are registered with the Windows `RegisterHotKey` API via a `HotkeyManager`. Each button registers its assigned key combination on load and unregisters it on delete or reassignment. Hotkeys work even when the app is minimized to the system tray.
 
 **Persistence** — each `SoundBoardButton` implements `Serialize()` / `Deserialized()` methods that convert its state to/from a `JsonObject`. The main window collects these objects into a `JsonArray` on save and reconstructs buttons from them on load.
 

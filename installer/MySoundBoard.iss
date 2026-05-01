@@ -30,6 +30,9 @@ PrivilegesRequired=admin
 ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 MinVersion=10.0.17763
+CloseApplications=yes
+CloseApplicationsFilter={#MyAppExeName}
+RestartApplications=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -42,6 +45,12 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "..\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; App icon bundled separately for uninstall display entry
 Source: "..\MySoundBoard\SoundboardIcon.ico"; DestDir: "{app}"; Flags: ignoreversion
+
+[InstallDelete]
+; Remove stale files from prior installs (dropped DLLs, etc.) before new files are laid down
+Type: files; Name: "{app}\*.dll"
+Type: files; Name: "{app}\*.json"
+Type: files; Name: "{app}\*.pdb"
 
 [Icons]
 Name: "{group}\{#MyAppName}";             Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\SoundboardIcon.ico"

@@ -9,12 +9,19 @@
               ShowInTaskbar="False">
     <Grid Margin="10">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <ui:TextBox x:Name="SearchBox"
+                    Grid.Row="0"
+                    PlaceholderText="Search icons…"
+                    Margin="0,0,0,8"
+                    TextChanged="SearchBox_TextChanged"/>
+
         <ui:ListView x:Name="IconList"
-                 Grid.Row="0"
+                 Grid.Row="1"
                  SelectionMode="Single"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -42,7 +49,7 @@
             </ui:ListView.ItemTemplate>
         </ui:ListView>
 
-        <StackPanel Grid.Row="1"
+        <StackPanel Grid.Row="2"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,8,0,0">

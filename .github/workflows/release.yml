@@ -32,9 +32,16 @@ jobs:
       - name: Compile installer
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\MySoundBoard.iss'
 
+      - name: Zip build output
+        run: |
+          $version = (Get-Item publish\MySoundBoard.exe).VersionInfo.FileVersion
+          Compress-Archive -Path publish\* -DestinationPath "dist\MySoundBoard-Build-$version.zip"
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist\MySoundBoard-Setup-*.exe
-          generate_release_notes: true
+          files: |
+            dist\MySoundBoard-Setup-*.exe
+            dist\MySoundBoard-Build-*.zip
+          generate_release_notes: false

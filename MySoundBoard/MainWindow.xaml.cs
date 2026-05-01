@@ -24,6 +24,7 @@ namespace MySoundBoard
         public HotkeyManager? HotkeyManager { get; private set; }
 
         private System.Windows.Forms.NotifyIcon? _trayIcon;
+        private System.Windows.Threading.DispatcherTimer? _searchDebounce;
 
         public static MainWindow Instance { get; private set; } = null!;
 
@@ -44,6 +45,16 @@ namespace MySoundBoard
 
             Loaded += MainWindow_Loaded;
             KeyDown += MainWindow_KeyDown;
+
+            _searchDebounce = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(150)
+            };
+            _searchDebounce.Tick += (s, e) =>
+            {
+                _searchDebounce!.Stop();
+                ApplySearch(SearchBox.Text);
+            };
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -177,7 +188,12 @@ namespace MySoundBoard
 
         private void SearchBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
-            var text = SearchBox.Text;
+            _searchDebounce?.Stop();
+            _searchDebounce?.Start();
+        }
+
+        private void ApplySearch(string text)
+        {
             foreach (var item in SoundBoardGrid.Items)
             {
                 if (item is SoundBoardButton btn)
@@ -318,6 +334,8 @@ namespace MySoundBoard
         private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             Volume = (float)VolumeSlider.Value;
+            if (VolumeLabel != null)
+                VolumeLabel.Text = $"{(int)Volume}%";
             var normalized = Volume / 100f;
             foreach (var item in SoundBoardGrid.Items)
                 if (item is SoundBoardButton btn) btn.UpdateVolume(normalized);

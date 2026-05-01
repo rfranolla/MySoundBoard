@@ -40,17 +40,15 @@ namespace MySoundBoard.Managers
             Initialize();
         }
 
+        // Resolved once at startup; null if NAudio.Vorbis is not installed.
+        private static readonly Type? _vorbisType =
+            Type.GetType("NAudio.Vorbis.VorbisWaveReader, NAudio.Vorbis");
+
         private static WaveStream CreateReader(string filepath)
         {
-            var ext = Path.GetExtension(filepath).ToLowerInvariant();
-            if (ext == ".ogg")
-            {
-                // NAudio.Vorbis.VorbisWaveReader — loaded via reflection so the build doesn't fail
-                // if the package is absent; callers should ensure NAudio.Vorbis is installed.
-                var type = Type.GetType("NAudio.Vorbis.VorbisWaveReader, NAudio.Vorbis");
-                if (type != null)
-                    return (WaveStream)Activator.CreateInstance(type, filepath)!;
-            }
+            if (Path.GetExtension(filepath).Equals(".ogg", StringComparison.OrdinalIgnoreCase)
+                && _vorbisType != null)
+                return (WaveStream)Activator.CreateInstance(_vorbisType, filepath)!;
             return new AudioFileReader(filepath);
         }
 

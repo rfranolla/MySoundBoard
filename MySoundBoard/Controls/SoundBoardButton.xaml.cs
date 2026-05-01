@@ -23,6 +23,7 @@ namespace MySoundBoard.Controls
 
         private bool LoopSound;
         private bool PlayThroughHeadphones;
+        private bool _fadeEnabled = true;
         private string soundFile = string.Empty;
         private float _buttonVolume = 1.0f;
         private string _buttonColor = string.Empty;
@@ -74,6 +75,9 @@ namespace MySoundBoard.Controls
 
             HeadPhoneButton.Background = PlayThroughHeadphones ? Brushes.Blue : _unselectedBrush;
             HeadPhoneButton.MouseOverBackground = PlayThroughHeadphones ? Brushes.DarkBlue : _unselectedBrushHover;
+
+            FadeButton.Background = _fadeEnabled ? Brushes.Blue : _unselectedBrush;
+            FadeButton.MouseOverBackground = _fadeEnabled ? Brushes.DarkBlue : _unselectedBrushHover;
 
             MainWindow.Instance.ThemeChanged += ThemeChanged_Event;
 
@@ -130,7 +134,7 @@ namespace MySoundBoard.Controls
                     }
 
                     _audioPlayer.TogglePlayPause(effectiveVol);
-                    if (_fadeInSeconds > 0)
+                    if (_fadeInSeconds > 0 && _fadeEnabled && !LoopSound)
                     {
                         _audioPlayer.BeginFadeIn(_fadeInSeconds * 1000);
                         _headphonePlayer?.BeginFadeIn(_fadeInSeconds * 1000);
@@ -185,7 +189,7 @@ namespace MySoundBoard.Controls
 
         private void StartFadeOutTimer()
         {
-            if (_fadeOutSeconds <= 0 || CurrentTrackLenght <= 0) return;
+            if (_fadeOutSeconds <= 0 || CurrentTrackLenght <= 0 || !_fadeEnabled || LoopSound) return;
             double delay = Math.Max(0, CurrentTrackLenght - _fadeOutSeconds);
             _fadeOutTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(delay) };
             _fadeOutTimer.Tick += (s, e) =>
@@ -247,6 +251,7 @@ namespace MySoundBoard.Controls
         private void ButtonVolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             _buttonVolume = (float)e.NewValue;
+            ButtonVolumeSlider.ToolTip = $"Button volume: {(int)(e.NewValue * 100)}%";
             float globalVol = MainWindow.Instance?.Volume / 100f ?? 1f;
             _audioPlayer?.SetVolume(globalVol * _buttonVolume);
             _headphonePlayer?.SetVolume(globalVol * _buttonVolume);
@@ -286,6 +291,14 @@ namespace MySoundBoard.Controls
             LoopSound = !LoopSound;
             LoopButton.Background = LoopSound ? Brushes.Blue : _unselectedBrush;
             LoopButton.MouseOverBackground = LoopSound ? Brushes.DarkBlue : _unselectedBrushHover;
+            FadeButton.IsEnabled = !LoopSound;
+        }
+
+        private void FadeButton_Click(object sender, RoutedEventArgs e)
+        {
+            _fadeEnabled = !_fadeEnabled;
+            FadeButton.Background = _fadeEnabled ? Brushes.Blue : _unselectedBrush;
+            FadeButton.MouseOverBackground = _fadeEnabled ? Brushes.DarkBlue : _unselectedBrushHover;
         }
 
         private void HeadphoneButton_Click(object sender, RoutedEventArgs e)
@@ -409,6 +422,7 @@ namespace MySoundBoard.Controls
         private void RootBorder_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
         {
             if (e.LeftButton != MouseButtonState.Pressed) return;
+            if (Mouse.Captured != null && !ReferenceEquals(Mouse.Captured, RootBorder)) return;
             var pos = e.GetPosition(null);
             var diff = _dragStartPoint - pos;
             if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
@@ -494,6 +508,7 @@ namespace MySoundBoard.Controls
             jObj.Add("ButtonColor", _buttonColor);
             jObj.Add("FadeInSeconds", _fadeInSeconds);
             jObj.Add("FadeOutSeconds", _fadeOutSeconds);
+            jObj.Add("FadeEnabled", _fadeEnabled);
             jObj.Add("AutoStopSeconds", _autoStopSeconds);
             if (_hotkeyId >= 0)
             {
@@ -513,6 +528,7 @@ namespace MySoundBoard.Controls
                 LoopSound = v.GetValue<bool>();
                 LoopButton.Background = LoopSound ? Brushes.Blue : _unselectedBrush;
                 LoopButton.MouseOverBackground = LoopSound ? Brushes.DarkBlue : _unselectedBrushHover;
+                FadeButton.IsEnabled = !LoopSound;
             }
             if (jObj.TryGetPropertyValue("PlayThroughHeadphones", out v) && v != null)
             {
@@ -549,6 +565,12 @@ namespace MySoundBoard.Controls
                 _fadeInSeconds = v.GetValue<double>();
             if (jObj.TryGetPropertyValue("FadeOutSeconds", out v) && v != null)
                 _fadeOutSeconds = v.GetValue<double>();
+            if (jObj.TryGetPropertyValue("FadeEnabled", out v) && v != null)
+            {
+                _fadeEnabled = v.GetValue<bool>();
+                FadeButton.Background = _fadeEnabled ? Brushes.Blue : _unselectedBrush;
+                FadeButton.MouseOverBackground = _fadeEnabled ? Brushes.DarkBlue : _unselectedBrushHover;
+            }
             if (jObj.TryGetPropertyValue("AutoStopSeconds", out v) && v != null)
                 _autoStopSeconds = v.GetValue<double>();
 

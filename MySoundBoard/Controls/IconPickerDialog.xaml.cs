@@ -1,4 +1,3 @@
-using System.Windows;
 using System.Windows.Controls;
 using Wpf.Ui.Controls;
 
@@ -6,6 +5,14 @@ namespace MySoundBoard.Controls
 {
     public partial class IconPickerDialog
     {
+        private static readonly IReadOnlyList<SymbolRegular> AllIcons =
+            Enum.GetValues<SymbolRegular>()
+                .Where(s => s.ToString().EndsWith("48"))
+                .OrderBy(s => s.ToString())
+                .ToList();
+
+        private static string _lastSearch = string.Empty;
+
         public SymbolRegular? SelectedSymbol { get; private set; }
 
         private readonly Action<SymbolRegular> _previewCallback;
@@ -18,14 +25,24 @@ namespace MySoundBoard.Controls
             _previewCallback = previewCallback;
             SelectedSymbol = currentSymbol;
 
-            var icons = Enum.GetValues<SymbolRegular>()
-                .Where(s => s.ToString().EndsWith("48"))
-                .OrderBy(s => s.ToString())
-                .ToList();
-
-            IconList.ItemsSource = icons;
+            SearchBox.Text = _lastSearch;
+            ApplyFilter(_lastSearch);
             IconList.SelectedItem = currentSymbol;
             IconList.ScrollIntoView(currentSymbol);
+        }
+
+        private void ApplyFilter(string text)
+        {
+            var filtered = string.IsNullOrWhiteSpace(text)
+                ? (IEnumerable<SymbolRegular>)AllIcons
+                : AllIcons.Where(s => s.ToString().Contains(text, StringComparison.OrdinalIgnoreCase));
+            IconList.ItemsSource = filtered.ToList();
+        }
+
+        private void SearchBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            _lastSearch = SearchBox.Text;
+            ApplyFilter(_lastSearch);
         }
 
         private void IconList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -37,9 +54,9 @@ namespace MySoundBoard.Controls
             }
         }
 
-        private void SelectButton_Click(object sender, RoutedEventArgs e) => DialogResult = true;
+        private void SelectButton_Click(object sender, System.Windows.RoutedEventArgs e) => DialogResult = true;
 
-        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        private void CancelButton_Click(object sender, System.Windows.RoutedEventArgs e)
         {
             _previewCallback(_originalSymbol);
             DialogResult = false;

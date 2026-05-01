@@ -3,12 +3,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:local="clr-namespace:MySoundBoard.Controls"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              mc:Ignorable="d"
-             d:DesignHeight="160" d:DesignWidth="150">
+             d:DesignHeight="200" d:DesignWidth="200">
     <Border x:Name="RootBorder" Width="150" Height="160" BorderThickness="1" BorderBrush="LightGray"
-            Padding="2" CornerRadius="4" AllowDrop="True"
+            Padding="2" CornerRadius="8" Margin="3" AllowDrop="True"
             PreviewMouseLeftButtonDown="RootBorder_PreviewMouseLeftButtonDown"
             MouseMove="RootBorder_MouseMove"
             DragEnter="RootBorder_DragEnter"
@@ -32,6 +31,7 @@
                 <ColumnDefinition/>
                 <ColumnDefinition/>
                 <ColumnDefinition/>
+                <ColumnDefinition/>
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="1*"/>
@@ -41,7 +41,7 @@
             </Grid.RowDefinitions>
 
             <!-- Title row -->
-            <Grid Grid.Row="0" Grid.ColumnSpan="4" Height="20" VerticalAlignment="Top">
+            <Grid Grid.Row="0" Grid.ColumnSpan="5" Height="20" VerticalAlignment="Top">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -55,7 +55,7 @@
             </Grid>
 
             <!-- Play button + progress + hotkey badge -->
-            <Grid Grid.Row="1" Grid.ColumnSpan="4" Margin="1,0,1,0">
+            <Grid Grid.Row="1" Grid.ColumnSpan="5" Margin="1,0,1,0">
                 <ui:Button x:Name="PlayButton" Icon="{ui:SymbolIcon Play48}" FontSize="80"
                            HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                            Click="PlayButton_Click"/>
@@ -74,7 +74,7 @@
 
             <!-- Per-button volume slider -->
             <Slider x:Name="ButtonVolumeSlider"
-                    Grid.Row="2" Grid.ColumnSpan="4"
+                    Grid.Row="2" Grid.ColumnSpan="5"
                     Minimum="0" Maximum="1" Value="1"
                     Margin="4,1,4,1" Height="14"
                     ToolTip="Button volume"
@@ -87,9 +87,12 @@
                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1" Click="LoopButton_Click"/>
             <ui:Button x:Name="HeadPhoneButton" Grid.Row="3" Grid.Column="2" Icon="{ui:SymbolIcon HeadphonesSoundWave20}" Padding="0"
                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1" Click="HeadphoneButton_Click"/>
-            <ui:Button x:Name="DeleteButton" Grid.Row="3" Grid.Column="3" Icon="{ui:SymbolIcon Symbol=Delete20}" Padding="0"
+            <ui:Button x:Name="FadeButton" Grid.Row="3" Grid.Column="3" Icon="{ui:SymbolIcon ArrowBidirectionalUpDown20}" Padding="0"
                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1"
-                       Click="DeleteButton_Click" Background="#AAFF0000" MouseOverBackground="#44FF0000"/>
+                       ToolTip="Toggle fade in/out" Click="FadeButton_Click"/>
+            <ui:Button x:Name="DeleteButton" Grid.Row="3" Grid.Column="4" Icon="{ui:SymbolIcon Symbol=Delete20}" Padding="0"
+                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1"
+                       Appearance="Danger" Click="DeleteButton_Click"/>
         </Grid>
     </Border>
 </UserControl>

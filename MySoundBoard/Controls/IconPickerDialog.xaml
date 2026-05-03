@@ -2,19 +2,30 @@
               xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
               xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
               xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+              xmlns:local="clr-namespace:MySoundBoard.Controls"
               Title="Choose an Icon"
               Width="700" Height="500"
               WindowStartupLocation="CenterOwner"
               ResizeMode="CanResizeWithGrip"
               ShowInTaskbar="False">
+    <ui:FluentWindow.Resources>
+        <local:SymbolDisplayNameConverter x:Key="SymbolDisplayName"/>
+    </ui:FluentWindow.Resources>
     <Grid Margin="10">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <ui:TextBox x:Name="SearchBox"
+                    Grid.Row="0"
+                    PlaceholderText="Search icons…"
+                    Margin="0,0,0,8"
+                    TextChanged="SearchBox_TextChanged"/>
+
         <ui:ListView x:Name="IconList"
-                 Grid.Row="0"
+                 Grid.Row="1"
                  SelectionMode="Single"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -30,9 +41,9 @@
                                 Width="80" Height="70"
                                 Margin="2"
                                 HorizontalAlignment="Center"
-                                ToolTip="{Binding}">
+                                ToolTip="{Binding Converter={StaticResource SymbolDisplayName}}">
                         <ui:SymbolIcon Symbol="{Binding}" FontSize="32" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding}"
+                        <TextBlock Text="{Binding Converter={StaticResource SymbolDisplayName}}"
                                    FontSize="8"
                                    TextWrapping="Wrap"
                                    TextAlignment="Center"
@@ -42,7 +53,7 @@
             </ui:ListView.ItemTemplate>
         </ui:ListView>
 
-        <StackPanel Grid.Row="1"
+        <StackPanel Grid.Row="2"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,8,0,0">

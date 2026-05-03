@@ -103,7 +103,7 @@ Each button has a row of small action icons along the bottom:
 | Headphones | Toggles dual output mode for this button. The button turns **blue** when enabled. When active, the sound plays on both the **Primary Output** and the **Secondary Output** device simultaneously (see [Audio Output Devices](#audio-output-devices)). |
 | Trash (Delete) | Removes this button from the board and stops any active playback. |
 
-**Right-click any button** for additional options:
+**Right-click any sound button** for additional options:
 
 | Option | Description |
 |--------|-------------|

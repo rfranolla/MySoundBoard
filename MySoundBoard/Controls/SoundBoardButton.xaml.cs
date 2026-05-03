@@ -21,10 +21,10 @@ namespace MySoundBoard.Controls
         private enum PlaybackState { Playing, Stopped, Paused }
         private PlaybackState _playbackState;
 
-        private bool LoopSound;
-        private bool PlayThroughHeadphones;
-        private bool _fadeEnabled = true;
-        private string soundFile = string.Empty;
+        private bool _loopSound;
+        private bool _playThroughHeadphones;
+        private bool _fadeEnabled = false;
+        private string _soundFile = string.Empty;
         private float _buttonVolume = 1.0f;
         private string _buttonColor = string.Empty;
 
@@ -40,7 +40,7 @@ namespace MySoundBoard.Controls
         private AudioPlayer? _audioPlayer;
         private AudioPlayer? _headphonePlayer;
         private SymbolRegular _customPlayIcon = SymbolRegular.Play48;
-        private DispatcherTimer _progressTimer;
+        private DispatcherTimer? _progressTimer;
         private DispatcherTimer? _fadeOutTimer;
         private DispatcherTimer? _autoStopTimer;
 
@@ -50,7 +50,7 @@ namespace MySoundBoard.Controls
         private Point _dragStartPoint;
 
         public string Title { get; set; } = string.Empty;
-        public double CurrentTrackLenght { get; set; }
+        public double CurrentTrackLength { get; set; }
 
         #endregion
 
@@ -73,8 +73,8 @@ namespace MySoundBoard.Controls
             _unselectedBrushHover = LoopButton.MouseOverBorderBrush;
             _playbackState = PlaybackState.Stopped;
 
-            HeadPhoneButton.Background = PlayThroughHeadphones ? Brushes.Blue : _unselectedBrush;
-            HeadPhoneButton.MouseOverBackground = PlayThroughHeadphones ? Brushes.DarkBlue : _unselectedBrushHover;
+            HeadPhoneButton.Background = _playThroughHeadphones ? Brushes.Blue : _unselectedBrush;
+            HeadPhoneButton.MouseOverBackground = _playThroughHeadphones ? Brushes.DarkBlue : _unselectedBrushHover;
 
             FadeButton.Background = _fadeEnabled ? Brushes.Blue : _unselectedBrush;
             FadeButton.MouseOverBackground = _fadeEnabled ? Brushes.DarkBlue : _unselectedBrushHover;
@@ -98,67 +98,68 @@ namespace MySoundBoard.Controls
 
         private void StartPlaying()
         {
-            if (string.IsNullOrEmpty(soundFile)) return;
+            if (string.IsNullOrEmpty(_soundFile)) return;
 
-            if (_playbackState == PlaybackState.Paused)
+            switch (_playbackState)
             {
-                float effectiveVol = (MainWindow.Instance.Volume / 100f) * _buttonVolume;
-                _audioPlayer?.TogglePlayPause(effectiveVol);
-                _headphonePlayer?.TogglePlayPause(effectiveVol);
-                return;
-            }
-
-            if (_playbackState == PlaybackState.Stopped)
-            {
-                try
+                case PlaybackState.Paused:
                 {
                     float effectiveVol = (MainWindow.Instance.Volume / 100f) * _buttonVolume;
-                    var outputDevice = MainWindow.GetSelectedOutputDevice();
-                    var headphoneDevice = MainWindow.GetSelectedHeadphoneDevice();
-                    bool useDualOutput = PlayThroughHeadphones
-                        && headphoneDevice != null
-                        && headphoneDevice.Guid != outputDevice?.Guid;
-
-                    _audioPlayer = new AudioPlayer(soundFile, effectiveVol, outputDevice!);
-                    _audioPlayer.PlaybackStopType = AudioPlayer.PlaybackStopTypes.PlaybackStoppedReachingEndOfFile;
-                    _audioPlayer.PlaybackPaused += _audioPlayer_PlaybackPaused;
-                    _audioPlayer.PlaybackResumed += _audioPlayer_PlaybackResumed;
-                    _audioPlayer.PlaybackStopped += _audioPlayer_PlaybackStopped;
-                    CurrentTrackLenght = _audioPlayer.GetLenghtInSeconds();
-
-                    if (useDualOutput)
+                    _audioPlayer?.TogglePlayPause(effectiveVol);
+                    _headphonePlayer?.TogglePlayPause(effectiveVol);
+                    return;
+                }
+                case PlaybackState.Stopped:
+                    try
                     {
-                        _headphonePlayer = new AudioPlayer(soundFile, effectiveVol, headphoneDevice!);
-                        _headphonePlayer.PlaybackStopType = AudioPlayer.PlaybackStopTypes.PlaybackStoppedReachingEndOfFile;
-                        _headphonePlayer.PlaybackStopped += _headphonePlayer_PlaybackStopped;
+                        float effectiveVol = (MainWindow.Instance.Volume / 100f) * _buttonVolume;
+                        var outputDevice = MainWindow.GetSelectedOutputDevice();
+                        var headphoneDevice = MainWindow.GetSelectedHeadphoneDevice();
+                        bool useDualOutput = _playThroughHeadphones
+                                             && headphoneDevice != null
+                                             && headphoneDevice.Guid != outputDevice?.Guid;
+
+                        _audioPlayer = new AudioPlayer(_soundFile, effectiveVol, outputDevice!);
+                        _audioPlayer.PlaybackStopType = AudioPlayer.PlaybackStopTypes.PlaybackStoppedReachingEndOfFile;
+                        _audioPlayer.PlaybackPaused += _audioPlayer_PlaybackPaused;
+                        _audioPlayer.PlaybackResumed += _audioPlayer_PlaybackResumed;
+                        _audioPlayer.PlaybackStopped += _audioPlayer_PlaybackStopped;
+                        CurrentTrackLength = _audioPlayer.GetLenghtInSeconds();
+
+                        if (useDualOutput)
+                        {
+                            _headphonePlayer = new AudioPlayer(_soundFile, effectiveVol, headphoneDevice!);
+                            _headphonePlayer.PlaybackStopType = AudioPlayer.PlaybackStopTypes.PlaybackStoppedReachingEndOfFile;
+                            _headphonePlayer.PlaybackStopped += _headphonePlayer_PlaybackStopped;
+                        }
+
+                        _audioPlayer.TogglePlayPause(effectiveVol);
+                        if (_fadeInSeconds > 0 && _fadeEnabled && !_loopSound)
+                        {
+                            _audioPlayer.BeginFadeIn(_fadeInSeconds * 1000);
+                            _headphonePlayer?.BeginFadeIn(_fadeInSeconds * 1000);
+                        }
+                        if (useDualOutput)
+                            _headphonePlayer?.TogglePlayPause(effectiveVol);
+
+                        PlayButton.Icon = new SymbolIcon { Symbol = SymbolRegular.Pause48 };
+                        ResetAndStartProgressTimer();
+                        StartFadeOutTimer();
+                        StartAutoStopTimer();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Windows.MessageBox.Show(
+                            $"Could not play '{System.IO.Path.GetFileName(_soundFile)}':\n{ex.Message}",
+                            "Playback Error",
+                            System.Windows.MessageBoxButton.OK,
+                            System.Windows.MessageBoxImage.Warning);
                     }
 
-                    _audioPlayer.TogglePlayPause(effectiveVol);
-                    if (_fadeInSeconds > 0 && _fadeEnabled && !LoopSound)
-                    {
-                        _audioPlayer.BeginFadeIn(_fadeInSeconds * 1000);
-                        _headphonePlayer?.BeginFadeIn(_fadeInSeconds * 1000);
-                    }
-                    if (useDualOutput)
-                        _headphonePlayer?.TogglePlayPause(effectiveVol);
-
-                    PlayButton.Icon = new SymbolIcon { Symbol = SymbolRegular.Pause48 };
-                    ResetAndStartProgressTimer();
-                    StartFadeOutTimer();
-                    StartAutoStopTimer();
-                }
-                catch (Exception ex)
-                {
-                    System.Windows.MessageBox.Show(
-                        $"Could not play '{System.IO.Path.GetFileName(soundFile)}':\n{ex.Message}",
-                        "Playback Error",
-                        System.Windows.MessageBoxButton.OK,
-                        System.Windows.MessageBoxImage.Warning);
-                }
-            }
-            else
-            {
-                StopPlayback();
+                    break;
+                default:
+                    StopPlayback();
+                    break;
             }
         }
 
@@ -189,8 +190,8 @@ namespace MySoundBoard.Controls
 
         private void StartFadeOutTimer()
         {
-            if (_fadeOutSeconds <= 0 || CurrentTrackLenght <= 0 || !_fadeEnabled || LoopSound) return;
-            double delay = Math.Max(0, CurrentTrackLenght - _fadeOutSeconds);
+            if (_fadeOutSeconds <= 0 || CurrentTrackLength <= 0 || !_fadeEnabled || _loopSound) return;
+            double delay = Math.Max(0, CurrentTrackLength - _fadeOutSeconds);
             _fadeOutTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(delay) };
             _fadeOutTimer.Tick += (s, e) =>
             {
@@ -229,20 +230,20 @@ namespace MySoundBoard.Controls
 
         private void ProgressTimer_Tick(object? sender, EventArgs e)
         {
-            if (_audioPlayer == null || CurrentTrackLenght <= 0) return;
-            double progress = Math.Clamp(_audioPlayer.GetPositionInSeconds() / CurrentTrackLenght, 0, 1);
+            if (_audioPlayer == null || CurrentTrackLength <= 0) return;
+            double progress = Math.Clamp(_audioPlayer.GetPositionInSeconds() / CurrentTrackLength, 0, 1);
             PlaybackFillRect.Width = progress * PlayButton.ActualWidth;
         }
 
         private void ResetAndStartProgressTimer()
         {
             PlaybackFillRect.Width = 0;
-            _progressTimer.Start();
+            _progressTimer?.Start();
         }
 
         private void StopProgressTimer()
         {
-            _progressTimer.Stop();
+            _progressTimer?.Stop();
             PlaybackFillRect.Width = 0;
         }
 
@@ -272,7 +273,7 @@ namespace MySoundBoard.Controls
             {
                 title.Text = openFileDialog.SafeFileName;
                 Title = title.Text;
-                soundFile = openFileDialog.FileName;
+                _soundFile = openFileDialog.FileName;
             }
         }
 
@@ -288,10 +289,10 @@ namespace MySoundBoard.Controls
 
         private void LoopButton_Click(object sender, RoutedEventArgs e)
         {
-            LoopSound = !LoopSound;
-            LoopButton.Background = LoopSound ? Brushes.Blue : _unselectedBrush;
-            LoopButton.MouseOverBackground = LoopSound ? Brushes.DarkBlue : _unselectedBrushHover;
-            FadeButton.IsEnabled = !LoopSound;
+            _loopSound = !_loopSound;
+            LoopButton.Background = _loopSound ? Brushes.Blue : _unselectedBrush;
+            LoopButton.MouseOverBackground = _loopSound ? Brushes.DarkBlue : _unselectedBrushHover;
+            FadeButton.IsEnabled = !_loopSound;
         }
 
         private void FadeButton_Click(object sender, RoutedEventArgs e)
@@ -303,9 +304,9 @@ namespace MySoundBoard.Controls
 
         private void HeadphoneButton_Click(object sender, RoutedEventArgs e)
         {
-            PlayThroughHeadphones = !PlayThroughHeadphones;
-            HeadPhoneButton.Background = PlayThroughHeadphones ? Brushes.Blue : _unselectedBrush;
-            HeadPhoneButton.MouseOverBackground = PlayThroughHeadphones ? Brushes.DarkBlue : _unselectedBrushHover;
+            _playThroughHeadphones = !_playThroughHeadphones;
+            HeadPhoneButton.Background = _playThroughHeadphones ? Brushes.Blue : _unselectedBrush;
+            HeadPhoneButton.MouseOverBackground = _playThroughHeadphones ? Brushes.DarkBlue : _unselectedBrushHover;
         }
 
         private void DeleteButton_Click(object sender, RoutedEventArgs e)
@@ -465,7 +466,7 @@ namespace MySoundBoard.Controls
                 CancelTimers();
                 _playbackState = PlaybackState.Stopped;
                 PlayButton.Icon = new SymbolIcon { Symbol = _customPlayIcon };
-                if (_audioPlayer?.PlaybackStopType == AudioPlayer.PlaybackStopTypes.PlaybackStoppedReachingEndOfFile && LoopSound)
+                if (_audioPlayer?.PlaybackStopType == AudioPlayer.PlaybackStopTypes.PlaybackStoppedReachingEndOfFile && _loopSound)
                     StartPlaying();
                 else
                     StopProgressTimer();
@@ -480,7 +481,7 @@ namespace MySoundBoard.Controls
             {
                 _playbackState = PlaybackState.Playing;
                 PlayButton.Icon = new SymbolIcon { Symbol = SymbolRegular.Stop24 };
-                _progressTimer.Start();
+                _progressTimer?.Start();
             });
         }
 
@@ -490,7 +491,7 @@ namespace MySoundBoard.Controls
             {
                 _playbackState = PlaybackState.Paused;
                 PlayButton.Icon = new SymbolIcon { Symbol = _customPlayIcon };
-                _progressTimer.Stop();
+                _progressTimer?.Stop();
             });
         }
 
@@ -499,9 +500,9 @@ namespace MySoundBoard.Controls
         public JsonObject Serialize()
         {
             var jObj = new JsonObject();
-            jObj.Add("LoopSound", LoopSound);
-            jObj.Add("PlayThroughHeadphones", PlayThroughHeadphones);
-            jObj.Add("soundFile", soundFile);
+            jObj.Add("LoopSound", _loopSound);
+            jObj.Add("PlayThroughHeadphones", _playThroughHeadphones);
+            jObj.Add("soundFile", _soundFile);
             jObj.Add("Title", Title);
             jObj.Add("CustomPlayIcon", _customPlayIcon.ToString());
             jObj.Add("ButtonVolume", _buttonVolume);
@@ -525,19 +526,19 @@ namespace MySoundBoard.Controls
 
             if (jObj.TryGetPropertyValue("LoopSound", out v) && v != null)
             {
-                LoopSound = v.GetValue<bool>();
-                LoopButton.Background = LoopSound ? Brushes.Blue : _unselectedBrush;
-                LoopButton.MouseOverBackground = LoopSound ? Brushes.DarkBlue : _unselectedBrushHover;
-                FadeButton.IsEnabled = !LoopSound;
+                _loopSound = v.GetValue<bool>();
+                LoopButton.Background = _loopSound ? Brushes.Blue : _unselectedBrush;
+                LoopButton.MouseOverBackground = _loopSound ? Brushes.DarkBlue : _unselectedBrushHover;
+                FadeButton.IsEnabled = !_loopSound;
             }
             if (jObj.TryGetPropertyValue("PlayThroughHeadphones", out v) && v != null)
             {
-                PlayThroughHeadphones = v.GetValue<bool>();
-                HeadPhoneButton.Background = PlayThroughHeadphones ? Brushes.Blue : _unselectedBrush;
-                HeadPhoneButton.MouseOverBackground = PlayThroughHeadphones ? Brushes.DarkBlue : _unselectedBrushHover;
+                _playThroughHeadphones = v.GetValue<bool>();
+                HeadPhoneButton.Background = _playThroughHeadphones ? Brushes.Blue : _unselectedBrush;
+                HeadPhoneButton.MouseOverBackground = _playThroughHeadphones ? Brushes.DarkBlue : _unselectedBrushHover;
             }
             if (jObj.TryGetPropertyValue("soundFile", out v) && v != null)
-                soundFile = v.GetValue<string>();
+                _soundFile = v.GetValue<string>();
             if (jObj.TryGetPropertyValue("Title", out v) && v != null)
             {
                 Title = v.GetValue<string>();
@@ -682,7 +683,7 @@ namespace MySoundBoard.Controls
             }
         }
 
-        private sealed class FadeSettingsWindow : System.Windows.Window
+        private sealed class FadeSettingsWindow : FluentWindow
         {
             private readonly System.Windows.Controls.Slider _inSlider;
             private readonly System.Windows.Controls.Slider _outSlider;
@@ -735,7 +736,7 @@ namespace MySoundBoard.Controls
             }
         }
 
-        private sealed class AutoStopWindow : System.Windows.Window
+        private sealed class AutoStopWindow : FluentWindow
         {
             private readonly System.Windows.Controls.Slider _slider;
             private readonly System.Windows.Controls.TextBlock _label;

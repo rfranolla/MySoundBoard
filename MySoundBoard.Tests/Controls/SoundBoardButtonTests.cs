@@ -38,7 +38,7 @@ namespace MySoundBoard.Tests.Controls
 
             Assert.AreEqual(false, json["LoopSound"]!.GetValue<bool>());
             Assert.AreEqual(false, json["PlayThroughHeadphones"]!.GetValue<bool>());
-            Assert.AreEqual(true, json["FadeEnabled"]!.GetValue<bool>());
+            Assert.AreEqual(false, json["FadeEnabled"]!.GetValue<bool>());
             Assert.AreEqual(1.0f, json["ButtonVolume"]!.GetValue<float>(), 0.001f);
             Assert.AreEqual(0.0, json["FadeInSeconds"]!.GetValue<double>(), 0.001);
             Assert.AreEqual(0.0, json["FadeOutSeconds"]!.GetValue<double>(), 0.001);
@@ -211,8 +211,8 @@ namespace MySoundBoard.Tests.Controls
 
             var result = WpfTestHost.Invoke(() => new SoundBoardButton(oldFormat).Serialize());
 
-            Assert.AreEqual(true, result["FadeEnabled"]!.GetValue<bool>(),
-                "FadeEnabled should default to true for old saves without the key");
+            Assert.AreEqual(false, result["FadeEnabled"]!.GetValue<bool>(),
+                "FadeEnabled should default to false for old saves without the key");
         }
 
         [TestMethod]

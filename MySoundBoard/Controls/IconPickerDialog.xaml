@@ -2,11 +2,15 @@
               xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
               xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
               xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+              xmlns:local="clr-namespace:MySoundBoard.Controls"
               Title="Choose an Icon"
               Width="700" Height="500"
               WindowStartupLocation="CenterOwner"
               ResizeMode="CanResizeWithGrip"
               ShowInTaskbar="False">
+    <ui:FluentWindow.Resources>
+        <local:SymbolDisplayNameConverter x:Key="SymbolDisplayName"/>
+    </ui:FluentWindow.Resources>
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -37,9 +41,9 @@
                                 Width="80" Height="70"
                                 Margin="2"
                                 HorizontalAlignment="Center"
-                                ToolTip="{Binding}">
+                                ToolTip="{Binding Converter={StaticResource SymbolDisplayName}}">
                         <ui:SymbolIcon Symbol="{Binding}" FontSize="32" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding}"
+                        <TextBlock Text="{Binding Converter={StaticResource SymbolDisplayName}}"
                                    FontSize="8"
                                    TextWrapping="Wrap"
                                    TextAlignment="Center"

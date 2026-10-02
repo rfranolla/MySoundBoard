@@ -31,8 +31,48 @@ namespace MySoundBoard.Managers
             set => _volume = value;
         }
 
-        public AudioPlayer(string filepath, float volume, DirectSoundDeviceInfo deviceInfo)
+        /// <summary>When true, the source rewinds at end of file so looping is gapless.</summary>
+        public bool Loop { get; set; }
+
+        /// <summary>Rewinds the underlying stream when it runs dry, keeping the output buffer full.</summary>
+        private sealed class LoopingSampleProvider : ISampleProvider
         {
+            private readonly ISampleProvider _source;
+            private readonly WaveStream _stream;
+            private readonly AudioPlayer _owner;
+
+            public LoopingSampleProvider(ISampleProvider source, WaveStream stream, AudioPlayer owner)
+            {
+                _source = source;
+                _stream = stream;
+                _owner = owner;
+            }
+
+            public WaveFormat WaveFormat => _source.WaveFormat;
+
+            public int Read(float[] buffer, int offset, int count)
+            {
+                int total = 0;
+                while (total < count)
+                {
+                    int read = _source.Read(buffer, offset + total, count - total);
+                    if (read == 0)
+                    {
+                        if (!_owner.Loop || _stream.Length == 0) break;
+                        _stream.Position = 0;
+                        // An empty read right after a rewind means there's nothing to loop.
+                        read = _source.Read(buffer, offset + total, count - total);
+                        if (read == 0) break;
+                    }
+                    total += read;
+                }
+                return total;
+            }
+        }
+
+        public AudioPlayer(string filepath, float volume, DirectSoundDeviceInfo deviceInfo, bool loop = false)
+        {
+            Loop = loop;
             PlaybackStopType = PlaybackStopTypes.PlaybackStoppedReachingEndOfFile;
             _filepath = filepath;
             _volume = volume;
@@ -40,15 +80,10 @@ namespace MySoundBoard.Managers
             Initialize();
         }
 
-        // Resolved once at startup; null if NAudio.Vorbis is not installed.
-        private static readonly Type? _vorbisType =
-            Type.GetType("NAudio.Vorbis.VorbisWaveReader, NAudio.Vorbis");
-
         private static WaveStream CreateReader(string filepath)
         {
-            if (Path.GetExtension(filepath).Equals(".ogg", StringComparison.OrdinalIgnoreCase)
-                && _vorbisType != null)
-                return (WaveStream)Activator.CreateInstance(_vorbisType, filepath)!;
+            if (Path.GetExtension(filepath).Equals(".ogg", StringComparison.OrdinalIgnoreCase))
+                return new NAudio.Vorbis.VorbisWaveReader(filepath);
             return new AudioFileReader(filepath);
         }
 
@@ -57,7 +92,7 @@ namespace MySoundBoard.Managers
             _reader?.Dispose();
             _reader = CreateReader(_filepath);
 
-            ISampleProvider source = _reader.ToSampleProvider();
+            ISampleProvider source = new LoopingSampleProvider(_reader.ToSampleProvider(), _reader, this);
             _volumeProvider = new VolumeSampleProvider(source) { Volume = _volume };
             _fadeProvider = new FadeInOutSampleProvider(_volumeProvider, initiallySilent: false);
 
@@ -116,12 +151,15 @@ namespace MySoundBoard.Managers
 
         public void Dispose()
         {
-            if (_output != null)
+            // Detach first so Stop() cannot re-enter Dispose or notify an owner that is tearing us down.
+            var output = _output;
+            _output = null;
+            if (output != null)
             {
-                if (_output.PlaybackState == PlaybackState.Playing)
-                    _output.Stop();
-                _output.Dispose();
-                _output = null;
+                output.PlaybackStopped -= Output_PlaybackStopped;
+                if (output.PlaybackState != PlaybackState.Stopped)
+                    output.Stop();
+                output.Dispose();
             }
             _reader?.Dispose();
             _reader = null;

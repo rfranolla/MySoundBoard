@@ -78,6 +78,25 @@ namespace MySoundBoard
             HeadphoneDevice.SelectedIndex = 0;
         }
 
+        // Re-enumerate when a dropdown opens so devices plugged in after startup show up.
+        private void DeviceCombo_DropDownOpened(object? sender, EventArgs e)
+        {
+            var current = DirectSoundOut.Devices.ToList();
+            RefreshDeviceCombo(OutputDevice, current);
+            RefreshDeviceCombo(HeadphoneDevice, current);
+        }
+
+        private static void RefreshDeviceCombo(System.Windows.Controls.ComboBox combo, List<DirectSoundDeviceInfo> devices)
+        {
+            var existing = combo.Items.OfType<DirectSoundDeviceInfo>().Select(d => d.Guid);
+            if (existing.SequenceEqual(devices.Select(d => d.Guid))) return;
+
+            var selected = (combo.SelectedItem as DirectSoundDeviceInfo)?.Description;
+            combo.ItemsSource = devices;
+            var match = devices.FirstOrDefault(d => d.Description == selected);
+            combo.SelectedItem = match ?? devices.FirstOrDefault();
+        }
+
         public static DirectSoundDeviceInfo? GetSelectedOutputDevice()
             => Instance.OutputDevice.SelectedItem as DirectSoundDeviceInfo;
 
@@ -116,6 +135,8 @@ namespace MySoundBoard
         protected override void OnClosing(CancelEventArgs e)
         {
             SaveSettings();
+            foreach (var item in SoundBoardGrid.Items)
+                if (item is SoundBoardButton btn) btn.Cleanup();
             HotkeyManager?.Dispose();
             _trayIcon?.Dispose();
             base.OnClosing(e);
@@ -210,7 +231,10 @@ namespace MySoundBoard
             => AddButtonToGrid(new SoundBoardButton());
 
         private void AddButtonToGrid(SoundBoardButton btn)
-            => SoundBoardGrid.Items.Insert(SoundBoardGrid.Items.Count - 1, btn);
+        {
+            SoundBoardGrid.Items.Insert(SoundBoardGrid.Items.Count - 1, btn);
+            ApplySearch(SearchBox.Text);
+        }
 
         public static void RemoveButton(SoundBoardButton button)
             => Instance.SoundBoardGrid.Items.Remove(button);
@@ -222,6 +246,7 @@ namespace MySoundBoard
             // Keep AddButton last
             int insertAt = Math.Min(idx + 1, SoundBoardGrid.Items.Count - 1);
             SoundBoardGrid.Items.Insert(insertAt, newButton);
+            ApplySearch(SearchBox.Text);
         }
 
         public void MoveButton(SoundBoardButton source, SoundBoardButton target)
@@ -246,7 +271,7 @@ namespace MySoundBoard
 
         private void AddLoadMenuEntry(FileInfo file)
         {
-            var boardName = file.Name.Split(".")[0];
+            var boardName = Path.GetFileNameWithoutExtension(file.Name);
             foreach (MenuItem existing in LoadMenuItem.Items)
                 if (existing.Header?.ToString() == boardName) return;
 
@@ -263,24 +288,57 @@ namespace MySoundBoard
             foreach (var item in SoundBoardGrid.Items)
                 if (item is SoundBoardButton btn) jArray.Add(btn.Serialize());
 
-            var boardName = SoundBoardTitle.Text;
-            var path = Path.Combine(AppDataDir, SoundBoardsDir, $"{boardName}.json");
-            File.WriteAllText(path, jArray.ToString());
-            AddLoadMenuEntry(new FileInfo(path));
+            var boardName = SoundBoardTitle.Text?.Trim() ?? string.Empty;
+            if (boardName.Length == 0 || boardName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            {
+                System.Windows.MessageBox.Show(
+                    "Please enter a board name that doesn't contain any of these characters: \\ / : * ? \" < > |",
+                    "Invalid Board Name", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                var path = Path.Combine(AppDataDir, SoundBoardsDir, $"{boardName}.json");
+                // Write to a temp file first so a failed save can't corrupt an existing board.
+                var tmp = path + ".tmp";
+                File.WriteAllText(tmp, jArray.ToString());
+                File.Move(tmp, path, overwrite: true);
+                AddLoadMenuEntry(new FileInfo(path));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                System.Windows.MessageBox.Show($"Could not save '{boardName}':\n{ex.Message}",
+                    "Save Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            }
         }
 
         private void LoadMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            ClearGrid();
             if (sender is not MenuItem menuItem) return;
             var file = menuItem.DataContext as FileInfo;
             if (file == null) return;
 
-            string json = File.ReadAllText(file.FullName);
-            if (JsonArray.Parse(json) is JsonArray arr)
+            // Parse the file before touching the grid so a bad file doesn't wipe the current board.
+            JsonArray? arr;
+            try
+            {
+                arr = JsonNode.Parse(File.ReadAllText(file.FullName)) as JsonArray;
+            }
+            catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException)
+            {
+                System.Windows.MessageBox.Show($"Could not load '{file.Name}':\n{ex.Message}",
+                    "Load Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                return;
+            }
+
+            // Old buttons must go first: their hotkeys would otherwise block the new ones from registering.
+            ClearGrid();
+            if (arr != null)
             {
                 foreach (var jObj in arr)
-                    AddButtonToGrid(new SoundBoardButton((JsonObject)jObj!));
+                    if (jObj is JsonObject obj)
+                        AddButtonToGrid(new SoundBoardButton(obj));
             }
             SoundBoardTitle.Text = menuItem.Header?.ToString();
         }

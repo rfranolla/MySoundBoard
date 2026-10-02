@@ -103,11 +103,11 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Margin="8,4,8,8">
                     <ui:TextBlock FontSize="11" Opacity="0.65" Margin="0,0,0,3">Primary Output</ui:TextBlock>
-                    <ComboBox x:Name="OutputDevice" ToolTip="Primary audio output — plays on your speakers or headset"/>
+                    <ComboBox x:Name="OutputDevice" DropDownOpened="DeviceCombo_DropDownOpened" ToolTip="Primary audio output — plays on your speakers or headset"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Margin="8,4,8,8">
                     <ui:TextBlock FontSize="11" Opacity="0.65" Margin="0,0,0,3">Secondary Output (mic routing)</ui:TextBlock>
-                    <ComboBox x:Name="HeadphoneDevice" ToolTip="Secondary output for mic routing (e.g. VB-Audio Cable Input)"/>
+                    <ComboBox x:Name="HeadphoneDevice" DropDownOpened="DeviceCombo_DropDownOpened" ToolTip="Secondary output for mic routing (e.g. VB-Audio Cable Input)"/>
                 </StackPanel>
             </Grid>
         </Grid>

@@ -17,11 +17,14 @@ namespace MySoundBoard.Controls
 
         private readonly Action<SymbolRegular> _previewCallback;
         private readonly SymbolRegular _originalSymbol;
+        private readonly System.Windows.Threading.DispatcherTimer _filterDebounce;
 
         public IconPickerDialog(SymbolRegular currentSymbol, Action<SymbolRegular> previewCallback)
         {
             InitializeComponent();
             _originalSymbol = currentSymbol;
+            _filterDebounce = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+            _filterDebounce.Tick += (s, a) => { _filterDebounce.Stop(); ApplyFilter(_lastSearch); };
             _previewCallback = previewCallback;
             SelectedSymbol = currentSymbol;
 
@@ -42,7 +45,8 @@ namespace MySoundBoard.Controls
         private void SearchBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
             _lastSearch = SearchBox.Text;
-            ApplyFilter(_lastSearch);
+            _filterDebounce.Stop();
+            _filterDebounce.Start();
         }
 
         private void IconList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -56,10 +60,15 @@ namespace MySoundBoard.Controls
 
         private void SelectButton_Click(object sender, System.Windows.RoutedEventArgs e) => DialogResult = true;
 
-        private void CancelButton_Click(object sender, System.Windows.RoutedEventArgs e)
+        private void CancelButton_Click(object sender, System.Windows.RoutedEventArgs e) => DialogResult = false;
+
+        // Covers Cancel, Esc and the window X: anything but Select restores the original icon.
+        protected override void OnClosed(EventArgs e)
         {
-            _previewCallback(_originalSymbol);
-            DialogResult = false;
+            _filterDebounce.Stop();
+            if (DialogResult != true)
+                _previewCallback(_originalSymbol);
+            base.OnClosed(e);
         }
     }
 }

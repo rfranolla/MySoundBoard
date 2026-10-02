@@ -23,6 +23,7 @@ namespace MySoundBoard
         public float Volume = 1.0f;
         public HotkeyManager? HotkeyManager { get; private set; }
 
+        private string _savedSnapshot = string.Empty;
         private System.Windows.Forms.NotifyIcon? _trayIcon;
         private System.Windows.Threading.DispatcherTimer? _searchDebounce;
 
@@ -62,6 +63,7 @@ namespace MySoundBoard
             var hwnd = new WindowInteropHelper(this).Handle;
             HotkeyManager = new HotkeyManager(hwnd);
             LoadSettings();
+            _savedSnapshot = BoardSnapshot();
             InitTray();
         }
 
@@ -134,6 +136,17 @@ namespace MySoundBoard
 
         protected override void OnClosing(CancelEventArgs e)
         {
+            if (BoardSnapshot() != _savedSnapshot)
+            {
+                var answer = System.Windows.MessageBox.Show(
+                    $"Save changes to '{SoundBoardTitle.Text}' before closing?",
+                    "Unsaved Changes", System.Windows.MessageBoxButton.YesNoCancel, System.Windows.MessageBoxImage.Question);
+                if (answer == System.Windows.MessageBoxResult.Cancel || (answer == System.Windows.MessageBoxResult.Yes && !SaveBoard()))
+                {
+                    e.Cancel = true;
+                    return;
+                }
+            }
             SaveSettings();
             foreach (var item in SoundBoardGrid.Items)
                 if (item is SoundBoardButton btn) btn.Cleanup();
@@ -282,7 +295,18 @@ namespace MySoundBoard
 
         // ── Save / Load ───────────────────────────────────────────────────────
 
-        private void SaveMenuItem_Click(object sender, RoutedEventArgs e)
+        private void SaveMenuItem_Click(object sender, RoutedEventArgs e) => SaveBoard();
+
+        // Serialized board + title, used to detect unsaved changes without tracking every edit.
+        private string BoardSnapshot()
+        {
+            var jArray = new JsonArray();
+            foreach (var item in SoundBoardGrid.Items)
+                if (item is SoundBoardButton btn) jArray.Add(btn.Serialize());
+            return (SoundBoardTitle.Text ?? string.Empty) + "\n" + jArray.ToString();
+        }
+
+        private bool SaveBoard()
         {
             var jArray = new JsonArray();
             foreach (var item in SoundBoardGrid.Items)
@@ -294,7 +318,7 @@ namespace MySoundBoard
                 System.Windows.MessageBox.Show(
                     "Please enter a board name that doesn't contain any of these characters: \\ / : * ? \" < > |",
                     "Invalid Board Name", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
-                return;
+                return false;
             }
 
             try
@@ -305,12 +329,15 @@ namespace MySoundBoard
                 File.WriteAllText(tmp, jArray.ToString());
                 File.Move(tmp, path, overwrite: true);
                 AddLoadMenuEntry(new FileInfo(path));
+                _savedSnapshot = BoardSnapshot();
+                return true;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 System.Windows.MessageBox.Show($"Could not save '{boardName}':\n{ex.Message}",
                     "Save Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
             }
+            return false;
         }
 
         private void LoadMenuItem_Click(object sender, RoutedEventArgs e)
@@ -341,6 +368,7 @@ namespace MySoundBoard
                         AddButtonToGrid(new SoundBoardButton(obj));
             }
             SoundBoardTitle.Text = menuItem.Header?.ToString();
+            _savedSnapshot = BoardSnapshot();
         }
 
         private void ClearGrid()

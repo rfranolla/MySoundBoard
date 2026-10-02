@@ -74,11 +74,11 @@ namespace MySoundBoard.Controls
             _unselectedBrushHover = LoopButton.MouseOverBorderBrush;
             _playbackState = PlaybackState.Stopped;
 
-            HeadPhoneButton.Background = _playThroughHeadphones ? Brushes.Blue : _unselectedBrush!;
-            HeadPhoneButton.MouseOverBackground = _playThroughHeadphones ? Brushes.DarkBlue : _unselectedBrushHover!;
+            HeadPhoneButton.Background = _playThroughHeadphones ? ActiveBrush : _unselectedBrush!;
+            HeadPhoneButton.MouseOverBackground = _playThroughHeadphones ? ActiveHoverBrush : _unselectedBrushHover!;
 
-            FadeButton.Background = _fadeEnabled ? Brushes.Blue : _unselectedBrush!;
-            FadeButton.MouseOverBackground = _fadeEnabled ? Brushes.DarkBlue : _unselectedBrushHover!;
+            FadeButton.Background = _fadeEnabled ? ActiveBrush : _unselectedBrush!;
+            FadeButton.MouseOverBackground = _fadeEnabled ? ActiveHoverBrush : _unselectedBrushHover!;
 
             MainWindow.Instance.ThemeChanged += ThemeChanged_Event;
 
@@ -91,6 +91,26 @@ namespace MySoundBoard.Controls
             var tmp = new Button();
             _unselectedBrush = tmp.Background;
             _unselectedBrushHover = tmp.MouseOverBorderBrush;
+            ApplyToggleStyles();
+        }
+
+        private const string IdleBorderKey = "ControlStrokeColorDefaultBrush";
+
+        private static Brush ThemeBrush(string key, Brush fallback)
+            => System.Windows.Application.Current?.TryFindResource(key) as Brush ?? fallback;
+
+        // Toggle highlight follows the theme accent instead of a fixed blue.
+        private static Brush ActiveBrush => ThemeBrush("SystemAccentColorPrimaryBrush", Brushes.Blue);
+        private static Brush ActiveHoverBrush => ThemeBrush("SystemAccentColorSecondaryBrush", Brushes.DarkBlue);
+
+        private void ApplyToggleStyles()
+        {
+            LoopButton.Background = _loopSound ? ActiveBrush : _unselectedBrush!;
+            LoopButton.MouseOverBackground = _loopSound ? ActiveHoverBrush : _unselectedBrushHover!;
+            HeadPhoneButton.Background = _playThroughHeadphones ? ActiveBrush : _unselectedBrush!;
+            HeadPhoneButton.MouseOverBackground = _playThroughHeadphones ? ActiveHoverBrush : _unselectedBrushHover!;
+            FadeButton.Background = _fadeEnabled ? ActiveBrush : _unselectedBrush!;
+            FadeButton.MouseOverBackground = _fadeEnabled ? ActiveHoverBrush : _unselectedBrushHover!;
         }
 
         // ── Playback ──────────────────────────────────────────────────────────
@@ -256,17 +276,18 @@ namespace MySoundBoard.Controls
         private void EditButton_Click(object sender, RoutedEventArgs e)
         {
             Debug.WriteLine("EditButton Click");
-            using var openFileDialog = new OpenFileDialog();
+            var openFileDialog = new Microsoft.Win32.OpenFileDialog();
             openFileDialog.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
             openFileDialog.Filter = "Audio files (*.mp3;*.wav;*.ogg)|*.mp3;*.wav;*.ogg|All files (*.*)|*.*";
             openFileDialog.FilterIndex = 1;
             openFileDialog.RestoreDirectory = true;
 
-            if (openFileDialog.ShowDialog() == DialogResult.OK && !string.IsNullOrWhiteSpace(openFileDialog.FileName))
+            if (openFileDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(openFileDialog.FileName))
             {
                 title.Text = openFileDialog.SafeFileName;
                 Title = title.Text;
                 _soundFile = openFileDialog.FileName;
+                UpdateMissingFileState();
             }
         }
 
@@ -285,23 +306,23 @@ namespace MySoundBoard.Controls
             _loopSound = !_loopSound;
             if (_audioPlayer != null) _audioPlayer.Loop = _loopSound;
             if (_headphonePlayer != null) _headphonePlayer.Loop = _loopSound;
-            LoopButton.Background = _loopSound ? Brushes.Blue : _unselectedBrush!;
-            LoopButton.MouseOverBackground = _loopSound ? Brushes.DarkBlue : _unselectedBrushHover!;
+            LoopButton.Background = _loopSound ? ActiveBrush : _unselectedBrush!;
+            LoopButton.MouseOverBackground = _loopSound ? ActiveHoverBrush : _unselectedBrushHover!;
             FadeButton.IsEnabled = !_loopSound;
         }
 
         private void FadeButton_Click(object sender, RoutedEventArgs e)
         {
             _fadeEnabled = !_fadeEnabled;
-            FadeButton.Background = _fadeEnabled ? Brushes.Blue : _unselectedBrush!;
-            FadeButton.MouseOverBackground = _fadeEnabled ? Brushes.DarkBlue : _unselectedBrushHover!;
+            FadeButton.Background = _fadeEnabled ? ActiveBrush : _unselectedBrush!;
+            FadeButton.MouseOverBackground = _fadeEnabled ? ActiveHoverBrush : _unselectedBrushHover!;
         }
 
         private void HeadphoneButton_Click(object sender, RoutedEventArgs e)
         {
             _playThroughHeadphones = !_playThroughHeadphones;
-            HeadPhoneButton.Background = _playThroughHeadphones ? Brushes.Blue : _unselectedBrush!;
-            HeadPhoneButton.MouseOverBackground = _playThroughHeadphones ? Brushes.DarkBlue : _unselectedBrushHover!;
+            HeadPhoneButton.Background = _playThroughHeadphones ? ActiveBrush : _unselectedBrush!;
+            HeadPhoneButton.MouseOverBackground = _playThroughHeadphones ? ActiveHoverBrush : _unselectedBrushHover!;
         }
 
         private void DeleteButton_Click(object sender, RoutedEventArgs e)
@@ -432,6 +453,14 @@ namespace MySoundBoard.Controls
             MainWindow.Instance?.AddButtonAfter(this, copy);
         }
 
+        // Dim the play button and explain why when the saved sound file has moved or been deleted.
+        private void UpdateMissingFileState()
+        {
+            bool missing = !string.IsNullOrEmpty(_soundFile) && !System.IO.File.Exists(_soundFile);
+            PlayButton.Opacity = missing ? 0.4 : 1.0;
+            PlayButton.ToolTip = missing ? $"Sound file not found: {_soundFile}" : null;
+        }
+
         private void UpdateHotkeyBadge()
         {
             if (string.IsNullOrEmpty(_hotkeyDisplay))
@@ -470,17 +499,17 @@ namespace MySoundBoard.Controls
         private void RootBorder_DragEnter(object sender, System.Windows.DragEventArgs e)
         {
             if (e.Data.GetDataPresent(typeof(SoundBoardButton)) && e.Data.GetData(typeof(SoundBoardButton)) != this)
-                RootBorder.BorderBrush = Brushes.DodgerBlue;
+                RootBorder.SetResourceReference(System.Windows.Controls.Border.BorderBrushProperty, "SystemAccentColorPrimaryBrush");
         }
 
         private void RootBorder_DragLeave(object sender, System.Windows.DragEventArgs e)
         {
-            RootBorder.BorderBrush = Brushes.LightGray;
+            RootBorder.SetResourceReference(System.Windows.Controls.Border.BorderBrushProperty, IdleBorderKey);
         }
 
         private void RootBorder_Drop(object sender, System.Windows.DragEventArgs e)
         {
-            RootBorder.BorderBrush = Brushes.LightGray;
+            RootBorder.SetResourceReference(System.Windows.Controls.Border.BorderBrushProperty, IdleBorderKey);
             if (e.Data.GetDataPresent(typeof(SoundBoardButton)))
             {
                 var source = (SoundBoardButton)e.Data.GetData(typeof(SoundBoardButton));
@@ -562,18 +591,19 @@ namespace MySoundBoard.Controls
             if (jObj.TryGetPropertyValue("LoopSound", out v) && v != null)
             {
                 _loopSound = v.GetValue<bool>();
-                LoopButton.Background = _loopSound ? Brushes.Blue : _unselectedBrush!;
-                LoopButton.MouseOverBackground = _loopSound ? Brushes.DarkBlue : _unselectedBrushHover!;
+                LoopButton.Background = _loopSound ? ActiveBrush : _unselectedBrush!;
+                LoopButton.MouseOverBackground = _loopSound ? ActiveHoverBrush : _unselectedBrushHover!;
                 FadeButton.IsEnabled = !_loopSound;
             }
             if (jObj.TryGetPropertyValue("PlayThroughHeadphones", out v) && v != null)
             {
                 _playThroughHeadphones = v.GetValue<bool>();
-                HeadPhoneButton.Background = _playThroughHeadphones ? Brushes.Blue : _unselectedBrush!;
-                HeadPhoneButton.MouseOverBackground = _playThroughHeadphones ? Brushes.DarkBlue : _unselectedBrushHover!;
+                HeadPhoneButton.Background = _playThroughHeadphones ? ActiveBrush : _unselectedBrush!;
+                HeadPhoneButton.MouseOverBackground = _playThroughHeadphones ? ActiveHoverBrush : _unselectedBrushHover!;
             }
             if (jObj.TryGetPropertyValue("soundFile", out v) && v != null)
-                _soundFile = v.GetValue<string>();
+                _soundFile = v.GetValue<string>() ?? string.Empty;
+                UpdateMissingFileState();
             if (jObj.TryGetPropertyValue("Title", out v) && v != null)
             {
                 Title = v.GetValue<string>();
@@ -610,8 +640,8 @@ namespace MySoundBoard.Controls
             if (jObj.TryGetPropertyValue("FadeEnabled", out v) && v != null)
             {
                 _fadeEnabled = v.GetValue<bool>();
-                FadeButton.Background = _fadeEnabled ? Brushes.Blue : _unselectedBrush!;
-                FadeButton.MouseOverBackground = _fadeEnabled ? Brushes.DarkBlue : _unselectedBrushHover!;
+                FadeButton.Background = _fadeEnabled ? ActiveBrush : _unselectedBrush!;
+                FadeButton.MouseOverBackground = _fadeEnabled ? ActiveHoverBrush : _unselectedBrushHover!;
             }
             if (jObj.TryGetPropertyValue("AutoStopSeconds", out v) && v != null)
                 _autoStopSeconds = v.GetValue<double>();

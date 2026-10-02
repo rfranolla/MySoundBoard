@@ -116,12 +116,27 @@ begin
         '');
       DownloadPage.Show;
       try
-        DownloadPage.Download;
-        Exec(ExpandConstant('{tmp}\windowsdesktop-runtime-win-x64.exe'),
-             '/install /quiet /norestart',
-             '', SW_SHOW, ewWaitUntilTerminated, ResultCode);
+        try
+          DownloadPage.Download;
+          if not Exec(ExpandConstant('{tmp}\windowsdesktop-runtime-win-x64.exe'),
+                      '/install /quiet /norestart',
+                      '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+            ResultCode := -1;
+        except
+          // Download failed (offline, blocked, etc.); fall through to the check below.
+          ResultCode := -1;
+        end;
       finally
         DownloadPage.Hide;
+      end;
+
+      // 0 = installed, 3010 = installed but reboot pending; anything else, confirm the runtime is really there.
+      if ((ResultCode <> 0) and (ResultCode <> 3010)) and (not IsDotNetDesktopRuntimeInstalled) then
+      begin
+        MsgBox('The .NET 8 Desktop Runtime could not be installed. Please install it manually from ' +
+               'https://dotnet.microsoft.com/download/dotnet/8.0 and run this installer again.',
+               mbError, MB_OK);
+        Result := False;
       end;
     end
     else

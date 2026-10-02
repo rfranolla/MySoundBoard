@@ -4,6 +4,42 @@ using System.IO;
 
 namespace MySoundBoard.Managers
 {
+    /// <summary>Rewinds the underlying stream when it runs dry, keeping the output buffer full.</summary>
+    internal sealed class LoopingSampleProvider : ISampleProvider
+    {
+        private readonly ISampleProvider _source;
+        private readonly WaveStream _stream;
+        private readonly Func<bool> _shouldLoop;
+
+        public LoopingSampleProvider(ISampleProvider source, WaveStream stream, Func<bool> shouldLoop)
+        {
+            _source = source;
+            _stream = stream;
+            _shouldLoop = shouldLoop;
+        }
+
+        public WaveFormat WaveFormat => _source.WaveFormat;
+
+        public int Read(float[] buffer, int offset, int count)
+        {
+            int total = 0;
+            while (total < count)
+            {
+                int read = _source.Read(buffer, offset + total, count - total);
+                if (read == 0)
+                {
+                    if (!_shouldLoop() || _stream.Length == 0) break;
+                    _stream.Position = 0;
+                    // An empty read right after a rewind means there's nothing to loop.
+                    read = _source.Read(buffer, offset + total, count - total);
+                    if (read == 0) break;
+                }
+                total += read;
+            }
+            return total;
+        }
+    }
+
     public class AudioPlayer
     {
         public enum PlaybackStopTypes
@@ -34,42 +70,6 @@ namespace MySoundBoard.Managers
         /// <summary>When true, the source rewinds at end of file so looping is gapless.</summary>
         public bool Loop { get; set; }
 
-        /// <summary>Rewinds the underlying stream when it runs dry, keeping the output buffer full.</summary>
-        private sealed class LoopingSampleProvider : ISampleProvider
-        {
-            private readonly ISampleProvider _source;
-            private readonly WaveStream _stream;
-            private readonly AudioPlayer _owner;
-
-            public LoopingSampleProvider(ISampleProvider source, WaveStream stream, AudioPlayer owner)
-            {
-                _source = source;
-                _stream = stream;
-                _owner = owner;
-            }
-
-            public WaveFormat WaveFormat => _source.WaveFormat;
-
-            public int Read(float[] buffer, int offset, int count)
-            {
-                int total = 0;
-                while (total < count)
-                {
-                    int read = _source.Read(buffer, offset + total, count - total);
-                    if (read == 0)
-                    {
-                        if (!_owner.Loop || _stream.Length == 0) break;
-                        _stream.Position = 0;
-                        // An empty read right after a rewind means there's nothing to loop.
-                        read = _source.Read(buffer, offset + total, count - total);
-                        if (read == 0) break;
-                    }
-                    total += read;
-                }
-                return total;
-            }
-        }
-
         public AudioPlayer(string filepath, float volume, DirectSoundDeviceInfo deviceInfo, bool loop = false)
         {
             Loop = loop;
@@ -92,7 +92,7 @@ namespace MySoundBoard.Managers
             _reader?.Dispose();
             _reader = CreateReader(_filepath);
 
-            ISampleProvider source = new LoopingSampleProvider(_reader.ToSampleProvider(), _reader, this);
+            ISampleProvider source = new LoopingSampleProvider(_reader.ToSampleProvider(), _reader, () => Loop);
             _volumeProvider = new VolumeSampleProvider(source) { Volume = _volume };
             _fadeProvider = new FadeInOutSampleProvider(_volumeProvider, initiallySilent: false);
 

@@ -18,8 +18,7 @@ namespace MySoundBoard.Controls
     {
         #region State
 
-        private enum PlaybackState { Playing, Stopped, Paused }
-        private PlaybackState _playbackState;
+        private bool _isPlaying;
 
         private bool _loopSound;
         private bool _playThroughHeadphones;
@@ -71,7 +70,6 @@ namespace MySoundBoard.Controls
 
         private void Initialize()
         {
-            _playbackState = PlaybackState.Stopped;
             _progressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
             _progressTimer.Tick += ProgressTimer_Tick;
         }
@@ -108,72 +106,67 @@ namespace MySoundBoard.Controls
 
         // ── Playback ──────────────────────────────────────────────────────────
 
-        private void PlayButton_Click(object sender, RoutedEventArgs e) => StartPlaying();
+        // Clicking (or the hotkey) toggles between starting from the beginning and stopping.
+        private void PlayButton_Click(object sender, RoutedEventArgs e) => TogglePlayback();
 
-        private void StartPlaying()
+        private void TogglePlayback()
         {
-            if (string.IsNullOrEmpty(_soundFile)) return;
+            if (_isPlaying)
+                StopPlayback();
+            else
+                StartPlayback();
+        }
 
-            switch (_playbackState)
+        private void StartPlayback()
+        {
+            if (string.IsNullOrEmpty(_soundFile) || _isPlaying) return;
+            try
             {
-                case PlaybackState.Paused:
-                    _audioPlayer?.TogglePlayPause(EffectiveVolume);
-                    _headphonePlayer?.TogglePlayPause(EffectiveVolume);
-                    return;
-                case PlaybackState.Stopped:
-                    try
-                    {
-                        // A looping restart or an earlier failed start can leave old players behind.
-                        ReleasePlayers();
+                // A looping restart or an earlier failed start can leave old players behind.
+                ReleasePlayers();
 
-                        float effectiveVol = EffectiveVolume;
-                        var outputDevice = MainWindow.GetSelectedOutputDevice();
-                        var headphoneDevice = MainWindow.GetSelectedHeadphoneDevice();
-                        bool useDualOutput = _playThroughHeadphones
-                                             && headphoneDevice != null
-                                             && headphoneDevice.Guid != outputDevice?.Guid;
+                float effectiveVol = EffectiveVolume;
+                var outputDevice = MainWindow.GetSelectedOutputDevice();
+                var headphoneDevice = MainWindow.GetSelectedHeadphoneDevice();
+                bool useDualOutput = _playThroughHeadphones
+                                     && headphoneDevice != null
+                                     && headphoneDevice.Guid != outputDevice?.Guid;
 
-                        _audioPlayer = new AudioPlayer(_soundFile, effectiveVol, outputDevice!, _loopSound);
-                        _audioPlayer.PlaybackPaused += _audioPlayer_PlaybackPaused;
-                        _audioPlayer.PlaybackResumed += _audioPlayer_PlaybackResumed;
-                        _audioPlayer.PlaybackStopped += _audioPlayer_PlaybackStopped;
-                        CurrentTrackLength = _audioPlayer.GetLengthInSeconds();
+                _audioPlayer = new AudioPlayer(_soundFile, effectiveVol, outputDevice!, _loopSound);
+                _audioPlayer.PlaybackStopped += _audioPlayer_PlaybackStopped;
+                CurrentTrackLength = _audioPlayer.GetLengthInSeconds();
 
-                        if (useDualOutput)
-                            _headphonePlayer = new AudioPlayer(_soundFile, effectiveVol, headphoneDevice!, _loopSound);
+                if (useDualOutput)
+                    _headphonePlayer = new AudioPlayer(_soundFile, effectiveVol, headphoneDevice!, _loopSound);
 
-                        _audioPlayer.TogglePlayPause(effectiveVol);
-                        if (_fadeInSeconds > 0 && _fadeEnabled && !_loopSound)
-                        {
-                            _audioPlayer.BeginFadeIn(_fadeInSeconds * 1000);
-                            _headphonePlayer?.BeginFadeIn(_fadeInSeconds * 1000);
-                        }
-                        _headphonePlayer?.TogglePlayPause(effectiveVol);
+                if (_fadeInSeconds > 0 && _fadeEnabled && !_loopSound)
+                {
+                    _audioPlayer.BeginFadeIn(_fadeInSeconds * 1000);
+                    _headphonePlayer?.BeginFadeIn(_fadeInSeconds * 1000);
+                }
+                _audioPlayer.Play();
+                _headphonePlayer?.Play();
 
-                        PlayButton.Icon = new SymbolIcon { Symbol = SymbolRegular.Pause48 };
-                        ResetAndStartProgressTimer();
-                    }
-                    catch (Exception ex)
-                    {
-                        ReleasePlayers();
-                        _playbackState = PlaybackState.Stopped;
-                        System.Windows.MessageBox.Show(
-                            $"Could not play '{System.IO.Path.GetFileName(_soundFile)}':\n{ex.Message}",
-                            "Playback Error",
-                            System.Windows.MessageBoxButton.OK,
-                            System.Windows.MessageBoxImage.Warning);
-                    }
-
-                    break;
-                default:
-                    StopPlayback();
-                    break;
+                _isPlaying = true;
+                PlayButton.Icon = new SymbolIcon { Symbol = SymbolRegular.Stop24 };
+                ResetAndStartProgressTimer();
+            }
+            catch (Exception ex)
+            {
+                ReleasePlayers();
+                _isPlaying = false;
+                System.Windows.MessageBox.Show(
+                    $"Could not play '{System.IO.Path.GetFileName(_soundFile)}':\n{ex.Message}",
+                    "Playback Error",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Warning);
             }
         }
 
+        /// <summary>Stops and resets to the beginning; the next play starts the sound over.</summary>
         public void StopPlayback()
         {
-            if (_playbackState == PlaybackState.Stopped) return;
+            if (!_isPlaying) return;
             CancelTimers();
             _audioPlayer?.Stop();
             _headphonePlayer?.Stop();
@@ -186,8 +179,8 @@ namespace MySoundBoard.Controls
         }
 
         // ── Timers ────────────────────────────────────────────────────────────
-        // Fade-out and auto-stop are driven from the progress tick so they follow
-        // playback: the stopwatch and the track position both freeze while paused.
+        // Fade-out and auto-stop are driven from the progress tick, so one timer covers
+        // the progress bar, the fade-out point and the auto-stop limit.
 
         private void CancelTimers()
         {
@@ -316,8 +309,6 @@ namespace MySoundBoard.Controls
         {
             if (_audioPlayer != null)
             {
-                _audioPlayer.PlaybackPaused -= _audioPlayer_PlaybackPaused;
-                _audioPlayer.PlaybackResumed -= _audioPlayer_PlaybackResumed;
                 _audioPlayer.PlaybackStopped -= _audioPlayer_PlaybackStopped;
                 _audioPlayer.Dispose();
                 _audioPlayer = null;
@@ -401,7 +392,7 @@ namespace MySoundBoard.Controls
             {
                 _hotkeyId = MainWindow.Instance?.HotkeyManager?.Register(
                     _hotkeyModifiers, _hotkeyVirtualKey,
-                    () => Dispatcher.Invoke(StartPlaying)) ?? -1;
+                    () => Dispatcher.Invoke(TogglePlayback)) ?? -1;
             }
             UpdateHotkeyBadge();
         }
@@ -528,36 +519,14 @@ namespace MySoundBoard.Controls
             {
                 if (_isCleanedUp) return;
                 CancelTimers();
-                _playbackState = PlaybackState.Stopped;
+                _isPlaying = false;
                 PlayButton.Icon = new SymbolIcon { Symbol = _customPlayIcon };
                 // Looping is normally gapless inside the player; this catches loop being
                 // switched on just as the track reached its end.
                 if (_audioPlayer?.PlaybackStopType == AudioPlayer.PlaybackStopTypes.PlaybackStoppedReachingEndOfFile && _loopSound)
-                    StartPlaying();
+                    StartPlayback();
                 else
                     StopProgressTimer();
-            });
-        }
-
-        private void _audioPlayer_PlaybackResumed()
-        {
-            Dispatcher.Invoke(() =>
-            {
-                _playbackState = PlaybackState.Playing;
-                PlayButton.Icon = new SymbolIcon { Symbol = SymbolRegular.Stop24 };
-                _playStopwatch.Start();
-                _progressTimer?.Start();
-            });
-        }
-
-        private void _audioPlayer_PlaybackPaused()
-        {
-            Dispatcher.Invoke(() =>
-            {
-                _playbackState = PlaybackState.Paused;
-                PlayButton.Icon = new SymbolIcon { Symbol = _customPlayIcon };
-                _playStopwatch.Stop();
-                _progressTimer?.Stop();
             });
         }
 

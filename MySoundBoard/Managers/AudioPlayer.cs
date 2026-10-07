@@ -58,9 +58,7 @@ namespace MySoundBoard.Managers
         private readonly string _filepath;
         private float _volume = 1.0f;
 
-        public event Action? PlaybackResumed;
         public event Action? PlaybackStopped;
-        public event Action? PlaybackPaused;
 
         public float Volume
         {
@@ -111,15 +109,11 @@ namespace MySoundBoard.Managers
             _fadeProvider?.BeginFadeOut(durationMs);
         }
 
-        public void Play(PlaybackState playbackState, double currentVolumeLevel)
+        /// <summary>Starts playback from the beginning. A player is single-use: once stopped it disposes itself.</summary>
+        public void Play()
         {
-            if (playbackState == PlaybackState.Stopped || playbackState == PlaybackState.Paused)
-                _output?.Play();
-
-            if (_volumeProvider != null)
-                _volumeProvider.Volume = (float)currentVolumeLevel;
-
-            PlaybackResumed?.Invoke();
+            if (_output?.PlaybackState == PlaybackState.Stopped)
+                _output.Play();
         }
 
         private void Output_PlaybackStopped(object? sender, StoppedEventArgs e)
@@ -132,28 +126,6 @@ namespace MySoundBoard.Managers
         {
             PlaybackStopType = PlaybackStopTypes.PlaybackStoppedByUser;
             _output?.Stop();
-        }
-
-        public void Pause()
-        {
-            if (_output == null) return;
-            _output.Pause();
-            PlaybackPaused?.Invoke();
-        }
-
-        public void TogglePlayPause(double currentVolumeLevel)
-        {
-            if (_output != null)
-            {
-                if (_output.PlaybackState == PlaybackState.Playing)
-                    Pause();
-                else
-                    Play(_output.PlaybackState, currentVolumeLevel);
-            }
-            else
-            {
-                Play(PlaybackState.Stopped, currentVolumeLevel);
-            }
         }
 
         public void Dispose()

@@ -204,24 +204,5 @@ namespace MySoundBoard.Tests.Managers
             Assert.IsFalse(fired);
         }
 
-        [TestMethod]
-        public void PlaybackResumed_EventCanBeSubscribed()
-        {
-            SkipIfUnavailable();
-            var player = CreatePlayer();
-            bool fired = false;
-            player.PlaybackResumed += () => fired = true;
-            Assert.IsFalse(fired);
-        }
-
-        [TestMethod]
-        public void PlaybackPaused_EventCanBeSubscribed()
-        {
-            SkipIfUnavailable();
-            var player = CreatePlayer();
-            bool fired = false;
-            player.PlaybackPaused += () => fired = true;
-            Assert.IsFalse(fired);
-        }
     }
 }

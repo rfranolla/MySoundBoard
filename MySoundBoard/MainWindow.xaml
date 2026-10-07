@@ -4,8 +4,16 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="MainWindow" Height="680" Width="900"
+        Title="MySoundBoard" Height="680" Width="900"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <ui:FluentWindow.InputBindings>
+        <KeyBinding Gesture="Ctrl+N" Command="{x:Static ApplicationCommands.New}"/>
+        <KeyBinding Gesture="Ctrl+S" Command="{x:Static ApplicationCommands.Save}"/>
+    </ui:FluentWindow.InputBindings>
+    <ui:FluentWindow.CommandBindings>
+        <CommandBinding Command="ApplicationCommands.New" Executed="NewMenuItem_Click"/>
+        <CommandBinding Command="ApplicationCommands.Save" Executed="SaveMenuItem_Click"/>
+    </ui:FluentWindow.CommandBindings>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -27,9 +35,15 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Menu Grid.Column="0">
-                <ui:MenuItem Header="_File">
-                    <ui:MenuItem Header="_Save" Icon="{ui:SymbolIcon Symbol=Save24}" Click="SaveMenuItem_Click"/>
+                <ui:MenuItem Header="_File" SubmenuOpened="FileMenu_SubmenuOpened">
+                    <ui:MenuItem Header="_New Board" InputGestureText="Ctrl+N" Icon="{ui:SymbolIcon Symbol=DocumentAdd24}" Click="NewMenuItem_Click"/>
+                    <ui:MenuItem Header="_Save" InputGestureText="Ctrl+S" Icon="{ui:SymbolIcon Symbol=Save24}" Click="SaveMenuItem_Click"/>
                     <ui:MenuItem Header="_Load" x:Name="LoadMenuItem" Icon="{ui:SymbolIcon Symbol=ArrowDownload24}"/>
+                    <Separator/>
+                    <ui:MenuItem Header="_Delete Current Board…" x:Name="DeleteBoardMenuItem" Icon="{ui:SymbolIcon Symbol=Delete20}" Click="DeleteBoardMenuItem_Click"/>
+                    <ui:MenuItem Header="Open Boards _Folder" Icon="{ui:SymbolIcon Symbol=FolderOpen24}" Click="OpenBoardsFolderMenuItem_Click"/>
+                    <Separator/>
+                    <ui:MenuItem Header="E_xit" Icon="{ui:SymbolIcon Symbol=ArrowExit20}" Click="ExitMenuItem_Click"/>
                 </ui:MenuItem>
                 <ui:MenuItem Header="_Tools">
                     <ui:MenuItem Header="Sort" Icon="{ui:SymbolIcon Symbol=ArrowSort24}" Click="SortMenuItem_Click"/>

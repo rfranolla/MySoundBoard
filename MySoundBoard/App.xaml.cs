@@ -25,6 +25,10 @@ namespace MySoundBoard
 
             base.OnStartup(e);
             DispatcherUnhandledException += OnDispatcherUnhandledException;
+
+            // Created here rather than via StartupUri: WPF still loads the StartupUri window after
+            // Shutdown() above, and closing that stray window would overwrite the saved settings.
+            new MainWindow().Show();
         }
 
         protected override void OnExit(ExitEventArgs e)

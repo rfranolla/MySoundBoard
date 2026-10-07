@@ -47,7 +47,8 @@ namespace MySoundBoard.Managers
             PlaybackStoppedByUser, PlaybackStoppedReachingEndOfFile
         }
 
-        public PlaybackStopTypes PlaybackStopType { get; set; }
+        /// <summary>Why playback last ended; a user stop or fade-out must not trigger a loop restart.</summary>
+        public PlaybackStopTypes PlaybackStopType { get; private set; } = PlaybackStopTypes.PlaybackStoppedReachingEndOfFile;
 
         private WaveStream? _reader;
         private VolumeSampleProvider? _volumeProvider;
@@ -73,7 +74,6 @@ namespace MySoundBoard.Managers
         public AudioPlayer(string filepath, float volume, DirectSoundDeviceInfo deviceInfo, bool loop = false)
         {
             Loop = loop;
-            PlaybackStopType = PlaybackStopTypes.PlaybackStoppedReachingEndOfFile;
             _filepath = filepath;
             _volume = volume;
             _deviceInfo = deviceInfo;
@@ -106,7 +106,10 @@ namespace MySoundBoard.Managers
             => _fadeProvider?.BeginFadeIn(durationMs);
 
         public void BeginFadeOut(double durationMs)
-            => _fadeProvider?.BeginFadeOut(durationMs);
+        {
+            PlaybackStopType = PlaybackStopTypes.PlaybackStoppedByUser;
+            _fadeProvider?.BeginFadeOut(durationMs);
+        }
 
         public void Play(PlaybackState playbackState, double currentVolumeLevel)
         {
@@ -125,7 +128,11 @@ namespace MySoundBoard.Managers
             PlaybackStopped?.Invoke();
         }
 
-        public void Stop() => _output?.Stop();
+        public void Stop()
+        {
+            PlaybackStopType = PlaybackStopTypes.PlaybackStoppedByUser;
+            _output?.Stop();
+        }
 
         public void Pause()
         {
@@ -165,7 +172,7 @@ namespace MySoundBoard.Managers
             _reader = null;
         }
 
-        public double GetLenghtInSeconds() => _reader?.TotalTime.TotalSeconds ?? 0;
+        public double GetLengthInSeconds() => _reader?.TotalTime.TotalSeconds ?? 0;
 
         public double GetPositionInSeconds() => _reader?.CurrentTime.TotalSeconds ?? 0;
 

@@ -11,8 +11,6 @@ namespace MySoundBoard.Controls
                 .OrderBy(s => s.ToString())
                 .ToList();
 
-        private static string _lastSearch = string.Empty;
-
         public SymbolRegular? SelectedSymbol { get; private set; }
 
         private readonly Action<SymbolRegular> _previewCallback;
@@ -24,12 +22,12 @@ namespace MySoundBoard.Controls
             InitializeComponent();
             _originalSymbol = currentSymbol;
             _filterDebounce = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
-            _filterDebounce.Tick += (s, a) => { _filterDebounce.Stop(); ApplyFilter(_lastSearch); };
+            _filterDebounce.Tick += (s, a) => { _filterDebounce.Stop(); ApplyFilter(SearchBox.Text); };
             _previewCallback = previewCallback;
             SelectedSymbol = currentSymbol;
 
-            SearchBox.Text = _lastSearch;
-            ApplyFilter(_lastSearch);
+            // Every open starts unfiltered so the current icon is always in the list.
+            ApplyFilter(string.Empty);
             IconList.SelectedItem = currentSymbol;
             IconList.ScrollIntoView(currentSymbol);
         }
@@ -44,7 +42,6 @@ namespace MySoundBoard.Controls
 
         private void SearchBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
-            _lastSearch = SearchBox.Text;
             _filterDebounce.Stop();
             _filterDebounce.Start();
         }

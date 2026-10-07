@@ -125,6 +125,27 @@ namespace MySoundBoard.Tests.Controls
         }
 
         [TestMethod]
+        public void RoundTrip_HotkeyThatFailsToRegister_IsKept()
+        {
+            Skip();
+            // The test host has no HotkeyManager, so registration always fails here.
+            var input = BuildJsonObject();
+            input["HotkeyModifiers"] = 2u;
+            input["HotkeyVirtualKey"] = 0x70u;
+            input["HotkeyDisplay"] = "Ctrl+F1";
+
+            var (result, unregistered) = WpfTestHost.Invoke(() =>
+            {
+                var btn = new SoundBoardButton(input);
+                return (btn.Serialize(), btn.HasUnregisteredHotkey);
+            });
+
+            Assert.IsTrue(unregistered);
+            Assert.AreEqual(0x70u, result["HotkeyVirtualKey"]!.GetValue<uint>());
+            Assert.AreEqual("Ctrl+F1", result["HotkeyDisplay"]!.GetValue<string>());
+        }
+
+        [TestMethod]
         public void RoundTrip_ButtonVolume_Preserved()
         {
             Skip();

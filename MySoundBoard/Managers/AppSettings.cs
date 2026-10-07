@@ -29,7 +29,10 @@ namespace MySoundBoard.Managers
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
-                File.WriteAllText(SettingsPath, JsonSerializer.Serialize(this));
+                // Same temp-then-rename as board saves, so a crash mid-write can't leave a truncated file.
+                var tmp = SettingsPath + ".tmp";
+                File.WriteAllText(tmp, JsonSerializer.Serialize(this));
+                File.Move(tmp, SettingsPath, overwrite: true);
             }
             catch { }
         }

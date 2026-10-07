@@ -1,3 +1,4 @@
+using MySoundBoard.Controls.Dialogs;
 using MySoundBoard.Managers;
 using System.Diagnostics;
 using System.Text.Json.Nodes;
@@ -8,7 +9,6 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Wpf.Ui.Controls;
 using Button = Wpf.Ui.Controls.Button;
-using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using TextBox = Wpf.Ui.Controls.TextBox;
 using UserControl = System.Windows.Controls.UserControl;
 
@@ -42,9 +42,6 @@ namespace MySoundBoard.Controls
         private SymbolRegular _customPlayIcon = SymbolRegular.Play48;
         private DispatcherTimer? _progressTimer;
 
-        private Brush? _unselectedBrush;
-        private Brush? _unselectedBrushHover;
-
         private Point _dragStartPoint;
         private bool _isCleanedUp;
         private bool _fadeOutStarted;
@@ -52,6 +49,10 @@ namespace MySoundBoard.Controls
 
         public string Title { get; set; } = string.Empty;
         public double CurrentTrackLength { get; set; }
+
+        /// <summary>The board has a hotkey for this button, but it couldn't be registered (e.g. another app owns it).</summary>
+        public bool HasUnregisteredHotkey => _hotkeyVirtualKey > 0 && _hotkeyId < 0;
+        public string HotkeyDisplay => _hotkeyDisplay;
 
         #endregion
 
@@ -70,47 +71,39 @@ namespace MySoundBoard.Controls
 
         private void Initialize()
         {
-            _unselectedBrush = LoopButton.Background;
-            _unselectedBrushHover = LoopButton.MouseOverBorderBrush;
             _playbackState = PlaybackState.Stopped;
-
-            HeadPhoneButton.Background = _playThroughHeadphones ? ActiveBrush : _unselectedBrush!;
-            HeadPhoneButton.MouseOverBackground = _playThroughHeadphones ? ActiveHoverBrush : _unselectedBrushHover!;
-
-            FadeButton.Background = _fadeEnabled ? ActiveBrush : _unselectedBrush!;
-            FadeButton.MouseOverBackground = _fadeEnabled ? ActiveHoverBrush : _unselectedBrushHover!;
-
-            MainWindow.Instance.ThemeChanged += ThemeChanged_Event;
-
             _progressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
             _progressTimer.Tick += ProgressTimer_Tick;
         }
 
-        private void ThemeChanged_Event(object? sender, RoutedEventArgs e)
-        {
-            var tmp = new Button();
-            _unselectedBrush = tmp.Background;
-            _unselectedBrushHover = tmp.MouseOverBorderBrush;
-            ApplyToggleStyles();
-        }
+        private float EffectiveVolume => (MainWindow.Instance?.Volume ?? 1f) * _buttonVolume;
+
+        // ── Toggle styling ────────────────────────────────────────────────────
+        // Resource references follow theme and accent changes on their own; clearing the
+        // local value hands the button back to its themed default style.
 
         private const string IdleBorderKey = "ControlStrokeColorDefaultBrush";
 
-        private static Brush ThemeBrush(string key, Brush fallback)
-            => System.Windows.Application.Current?.TryFindResource(key) as Brush ?? fallback;
-
-        // Toggle highlight follows the theme accent instead of a fixed blue.
-        private static Brush ActiveBrush => ThemeBrush("SystemAccentColorPrimaryBrush", Brushes.Blue);
-        private static Brush ActiveHoverBrush => ThemeBrush("SystemAccentColorSecondaryBrush", Brushes.DarkBlue);
+        private static void SetToggleStyle(Button button, bool active)
+        {
+            if (active)
+            {
+                button.SetResourceReference(BackgroundProperty, "SystemAccentColorPrimaryBrush");
+                button.SetResourceReference(Button.MouseOverBackgroundProperty, "SystemAccentColorSecondaryBrush");
+            }
+            else
+            {
+                button.ClearValue(BackgroundProperty);
+                button.ClearValue(Button.MouseOverBackgroundProperty);
+            }
+        }
 
         private void ApplyToggleStyles()
         {
-            LoopButton.Background = _loopSound ? ActiveBrush : _unselectedBrush!;
-            LoopButton.MouseOverBackground = _loopSound ? ActiveHoverBrush : _unselectedBrushHover!;
-            HeadPhoneButton.Background = _playThroughHeadphones ? ActiveBrush : _unselectedBrush!;
-            HeadPhoneButton.MouseOverBackground = _playThroughHeadphones ? ActiveHoverBrush : _unselectedBrushHover!;
-            FadeButton.Background = _fadeEnabled ? ActiveBrush : _unselectedBrush!;
-            FadeButton.MouseOverBackground = _fadeEnabled ? ActiveHoverBrush : _unselectedBrushHover!;
+            SetToggleStyle(LoopButton, _loopSound);
+            SetToggleStyle(HeadPhoneButton, _playThroughHeadphones);
+            SetToggleStyle(FadeButton, _fadeEnabled);
+            FadeButton.IsEnabled = !_loopSound;
         }
 
         // ── Playback ──────────────────────────────────────────────────────────
@@ -124,19 +117,16 @@ namespace MySoundBoard.Controls
             switch (_playbackState)
             {
                 case PlaybackState.Paused:
-                {
-                    float effectiveVol = (MainWindow.Instance.Volume / 100f) * _buttonVolume;
-                    _audioPlayer?.TogglePlayPause(effectiveVol);
-                    _headphonePlayer?.TogglePlayPause(effectiveVol);
+                    _audioPlayer?.TogglePlayPause(EffectiveVolume);
+                    _headphonePlayer?.TogglePlayPause(EffectiveVolume);
                     return;
-                }
                 case PlaybackState.Stopped:
                     try
                     {
                         // A looping restart or an earlier failed start can leave old players behind.
                         ReleasePlayers();
 
-                        float effectiveVol = (MainWindow.Instance.Volume / 100f) * _buttonVolume;
+                        float effectiveVol = EffectiveVolume;
                         var outputDevice = MainWindow.GetSelectedOutputDevice();
                         var headphoneDevice = MainWindow.GetSelectedHeadphoneDevice();
                         bool useDualOutput = _playThroughHeadphones
@@ -144,18 +134,13 @@ namespace MySoundBoard.Controls
                                              && headphoneDevice.Guid != outputDevice?.Guid;
 
                         _audioPlayer = new AudioPlayer(_soundFile, effectiveVol, outputDevice!, _loopSound);
-                        _audioPlayer.PlaybackStopType = AudioPlayer.PlaybackStopTypes.PlaybackStoppedReachingEndOfFile;
                         _audioPlayer.PlaybackPaused += _audioPlayer_PlaybackPaused;
                         _audioPlayer.PlaybackResumed += _audioPlayer_PlaybackResumed;
                         _audioPlayer.PlaybackStopped += _audioPlayer_PlaybackStopped;
-                        CurrentTrackLength = _audioPlayer.GetLenghtInSeconds();
+                        CurrentTrackLength = _audioPlayer.GetLengthInSeconds();
 
                         if (useDualOutput)
-                        {
                             _headphonePlayer = new AudioPlayer(_soundFile, effectiveVol, headphoneDevice!, _loopSound);
-                            _headphonePlayer.PlaybackStopType = AudioPlayer.PlaybackStopTypes.PlaybackStoppedReachingEndOfFile;
-                            _headphonePlayer.PlaybackStopped += _headphonePlayer_PlaybackStopped;
-                        }
 
                         _audioPlayer.TogglePlayPause(effectiveVol);
                         if (_fadeInSeconds > 0 && _fadeEnabled && !_loopSound)
@@ -163,8 +148,7 @@ namespace MySoundBoard.Controls
                             _audioPlayer.BeginFadeIn(_fadeInSeconds * 1000);
                             _headphonePlayer?.BeginFadeIn(_fadeInSeconds * 1000);
                         }
-                        if (useDualOutput)
-                            _headphonePlayer?.TogglePlayPause(effectiveVol);
+                        _headphonePlayer?.TogglePlayPause(effectiveVol);
 
                         PlayButton.Icon = new SymbolIcon { Symbol = SymbolRegular.Pause48 };
                         ResetAndStartProgressTimer();
@@ -191,23 +175,14 @@ namespace MySoundBoard.Controls
         {
             if (_playbackState == PlaybackState.Stopped) return;
             CancelTimers();
-            if (_audioPlayer != null)
-            {
-                _audioPlayer.PlaybackStopType = AudioPlayer.PlaybackStopTypes.PlaybackStoppedByUser;
-                _audioPlayer.Stop();
-            }
-            if (_headphonePlayer != null)
-            {
-                _headphonePlayer.PlaybackStopType = AudioPlayer.PlaybackStopTypes.PlaybackStoppedByUser;
-                _headphonePlayer.Stop();
-            }
+            _audioPlayer?.Stop();
+            _headphonePlayer?.Stop();
         }
 
-        public void UpdateVolume(float globalVolume)
+        public void UpdateVolume()
         {
-            float effective = globalVolume * _buttonVolume;
-            _audioPlayer?.SetVolume(effective);
-            _headphonePlayer?.SetVolume(effective);
+            _audioPlayer?.SetVolume(EffectiveVolume);
+            _headphonePlayer?.SetVolume(EffectiveVolume);
         }
 
         // ── Timers ────────────────────────────────────────────────────────────
@@ -237,7 +212,6 @@ namespace MySoundBoard.Controls
                 && position >= CurrentTrackLength - _fadeOutSeconds)
             {
                 _fadeOutStarted = true;
-                _audioPlayer.PlaybackStopType = AudioPlayer.PlaybackStopTypes.PlaybackStoppedByUser;
                 _audioPlayer.BeginFadeOut(_fadeOutSeconds * 1000);
                 _headphonePlayer?.BeginFadeOut(_fadeOutSeconds * 1000);
             }
@@ -266,21 +240,20 @@ namespace MySoundBoard.Controls
         {
             _buttonVolume = (float)e.NewValue;
             ButtonVolumeSlider.ToolTip = $"Button volume: {(int)(e.NewValue * 100)}%";
-            float globalVol = MainWindow.Instance?.Volume / 100f ?? 1f;
-            _audioPlayer?.SetVolume(globalVol * _buttonVolume);
-            _headphonePlayer?.SetVolume(globalVol * _buttonVolume);
+            UpdateVolume();
         }
 
         // ── Edit / Icon / Loop / Headphone / Delete ───────────────────────────
 
         private void EditButton_Click(object sender, RoutedEventArgs e)
         {
-            Debug.WriteLine("EditButton Click");
-            var openFileDialog = new Microsoft.Win32.OpenFileDialog();
-            openFileDialog.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
-            openFileDialog.Filter = "Audio files (*.mp3;*.wav;*.ogg)|*.mp3;*.wav;*.ogg|All files (*.*)|*.*";
-            openFileDialog.FilterIndex = 1;
-            openFileDialog.RestoreDirectory = true;
+            var openFileDialog = new Microsoft.Win32.OpenFileDialog
+            {
+                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic),
+                Filter = "Audio files (*.mp3;*.wav;*.ogg)|*.mp3;*.wav;*.ogg|All files (*.*)|*.*",
+                FilterIndex = 1,
+                RestoreDirectory = true
+            };
 
             if (openFileDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(openFileDialog.FileName))
             {
@@ -306,23 +279,19 @@ namespace MySoundBoard.Controls
             _loopSound = !_loopSound;
             if (_audioPlayer != null) _audioPlayer.Loop = _loopSound;
             if (_headphonePlayer != null) _headphonePlayer.Loop = _loopSound;
-            LoopButton.Background = _loopSound ? ActiveBrush : _unselectedBrush!;
-            LoopButton.MouseOverBackground = _loopSound ? ActiveHoverBrush : _unselectedBrushHover!;
-            FadeButton.IsEnabled = !_loopSound;
+            ApplyToggleStyles();
         }
 
         private void FadeButton_Click(object sender, RoutedEventArgs e)
         {
             _fadeEnabled = !_fadeEnabled;
-            FadeButton.Background = _fadeEnabled ? ActiveBrush : _unselectedBrush!;
-            FadeButton.MouseOverBackground = _fadeEnabled ? ActiveHoverBrush : _unselectedBrushHover!;
+            ApplyToggleStyles();
         }
 
         private void HeadphoneButton_Click(object sender, RoutedEventArgs e)
         {
             _playThroughHeadphones = !_playThroughHeadphones;
-            HeadPhoneButton.Background = _playThroughHeadphones ? ActiveBrush : _unselectedBrush!;
-            HeadPhoneButton.MouseOverBackground = _playThroughHeadphones ? ActiveHoverBrush : _unselectedBrushHover!;
+            ApplyToggleStyles();
         }
 
         private void DeleteButton_Click(object sender, RoutedEventArgs e)
@@ -338,13 +307,7 @@ namespace MySoundBoard.Controls
             _progressTimer?.Stop();
             if (_progressTimer != null)
                 _progressTimer.Tick -= ProgressTimer_Tick;
-            if (MainWindow.Instance != null)
-                MainWindow.Instance.ThemeChanged -= ThemeChanged_Event;
-            if (_hotkeyId >= 0)
-            {
-                MainWindow.Instance?.HotkeyManager?.Unregister(_hotkeyId);
-                _hotkeyId = -1;
-            }
+            UnregisterHotkey();
             ReleasePlayers();
         }
 
@@ -359,12 +322,8 @@ namespace MySoundBoard.Controls
                 _audioPlayer.Dispose();
                 _audioPlayer = null;
             }
-            if (_headphonePlayer != null)
-            {
-                _headphonePlayer.PlaybackStopped -= _headphonePlayer_PlaybackStopped;
-                _headphonePlayer.Dispose();
-                _headphonePlayer = null;
-            }
+            _headphonePlayer?.Dispose();
+            _headphonePlayer = null;
         }
 
         // ── Context menu ──────────────────────────────────────────────────────
@@ -378,46 +337,89 @@ namespace MySoundBoard.Controls
         private void SetColorMenuItem_Click(object sender, RoutedEventArgs e)
         {
             using var dlg = new System.Windows.Forms.ColorDialog();
-            if (!string.IsNullOrEmpty(_buttonColor))
-            {
-                var c = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(_buttonColor);
-                dlg.Color = System.Drawing.Color.FromArgb(c.R, c.G, c.B);
-            }
+            if (TryParseColor(_buttonColor, out var current))
+                dlg.Color = System.Drawing.Color.FromArgb(current.R, current.G, current.B);
             if (dlg.ShowDialog() == DialogResult.OK)
+                ApplyButtonColor($"#{dlg.Color.R:X2}{dlg.Color.G:X2}{dlg.Color.B:X2}");
+        }
+
+        private static bool TryParseColor(string value, out Color color)
+        {
+            color = default;
+            if (string.IsNullOrEmpty(value)) return false;
+            try
             {
-                _buttonColor = $"#{dlg.Color.R:X2}{dlg.Color.G:X2}{dlg.Color.B:X2}";
-                RootBorder.Background = new SolidColorBrush(
-                    (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(_buttonColor));
+                color = (Color)ColorConverter.ConvertFromString(value);
+                return true;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+        }
+
+        // Unparseable colours (hand-edited or corrupt boards) fall back to the theme background.
+        private void ApplyButtonColor(string value)
+        {
+            if (TryParseColor(value, out var color))
+            {
+                _buttonColor = value;
+                RootBorder.Background = new SolidColorBrush(color);
+            }
+            else
+            {
+                _buttonColor = string.Empty;
+                RootBorder.ClearValue(System.Windows.Controls.Border.BackgroundProperty);
             }
         }
 
         private void SetHotkeyMenuItem_Click(object sender, RoutedEventArgs e)
         {
             var win = new HotkeyInputWindow { Owner = System.Windows.Window.GetWindow(this) };
-            if (win.ShowDialog() == true && win.WasAssigned)
-            {
-                if (_hotkeyId >= 0)
-                    MainWindow.Instance?.HotkeyManager?.Unregister(_hotkeyId);
+            if (win.ShowDialog() != true) return;
 
-                _hotkeyModifiers = win.CapturedModifiers;
-                _hotkeyVirtualKey = win.CapturedKey;
-                _hotkeyDisplay = win.HotkeyText;
+            UnregisterHotkey();
+            _hotkeyModifiers = win.CapturedModifiers;
+            _hotkeyVirtualKey = win.CapturedKey;
+            _hotkeyDisplay = win.HotkeyText;
+            RegisterHotkey();
+
+            if (_hotkeyId < 0)
+            {
+                ClearHotkey();
+                System.Windows.MessageBox.Show(
+                    $"The hotkey '{win.HotkeyText}' is already in use by another application or button.",
+                    "Hotkey Unavailable", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            }
+        }
+
+        // Registers the stored hotkey. On failure the hotkey stays assigned (so it is still
+        // saved with the board) and the badge shows it struck through.
+        private void RegisterHotkey()
+        {
+            if (_hotkeyVirtualKey > 0)
+            {
                 _hotkeyId = MainWindow.Instance?.HotkeyManager?.Register(
                     _hotkeyModifiers, _hotkeyVirtualKey,
                     () => Dispatcher.Invoke(StartPlaying)) ?? -1;
-
-                if (_hotkeyId < 0)
-                {
-                    _hotkeyDisplay = string.Empty;
-                    _hotkeyVirtualKey = 0;
-                    _hotkeyModifiers = 0;
-                    System.Windows.MessageBox.Show(
-                        $"The hotkey '{win.HotkeyText}' is already in use by another application or button.",
-                        "Hotkey Unavailable", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
-                }
-
-                UpdateHotkeyBadge();
             }
+            UpdateHotkeyBadge();
+        }
+
+        private void UnregisterHotkey()
+        {
+            if (_hotkeyId < 0) return;
+            MainWindow.Instance?.HotkeyManager?.Unregister(_hotkeyId);
+            _hotkeyId = -1;
+        }
+
+        private void ClearHotkey()
+        {
+            UnregisterHotkey();
+            _hotkeyModifiers = 0;
+            _hotkeyVirtualKey = 0;
+            _hotkeyDisplay = string.Empty;
+            UpdateHotkeyBadge();
         }
 
         private void FadeMenuItem_Click(object sender, RoutedEventArgs e)
@@ -449,6 +451,7 @@ namespace MySoundBoard.Controls
             // Hotkeys must be unique — strip from duplicate
             jObj.Remove("HotkeyModifiers");
             jObj.Remove("HotkeyVirtualKey");
+            jObj.Remove("HotkeyDisplay");
             var copy = new SoundBoardButton(jObj);
             MainWindow.Instance?.AddButtonAfter(this, copy);
         }
@@ -466,12 +469,11 @@ namespace MySoundBoard.Controls
             if (string.IsNullOrEmpty(_hotkeyDisplay))
             {
                 HotkeyBadge.Visibility = Visibility.Collapsed;
+                return;
             }
-            else
-            {
-                HotkeyBadgeText.Text = _hotkeyDisplay;
-                HotkeyBadge.Visibility = Visibility.Visible;
-            }
+            HotkeyBadgeText.Text = _hotkeyDisplay;
+            HotkeyBadgeText.TextDecorations = HasUnregisteredHotkey ? TextDecorations.Strikethrough : null;
+            HotkeyBadge.Visibility = Visibility.Visible;
         }
 
         // ── Drag-and-drop ─────────────────────────────────────────────────────
@@ -528,14 +530,14 @@ namespace MySoundBoard.Controls
                 CancelTimers();
                 _playbackState = PlaybackState.Stopped;
                 PlayButton.Icon = new SymbolIcon { Symbol = _customPlayIcon };
+                // Looping is normally gapless inside the player; this catches loop being
+                // switched on just as the track reached its end.
                 if (_audioPlayer?.PlaybackStopType == AudioPlayer.PlaybackStopTypes.PlaybackStoppedReachingEndOfFile && _loopSound)
                     StartPlaying();
                 else
                     StopProgressTimer();
             });
         }
-
-        private void _headphonePlayer_PlaybackStopped() { }
 
         private void _audioPlayer_PlaybackResumed()
         {
@@ -563,19 +565,22 @@ namespace MySoundBoard.Controls
 
         public JsonObject Serialize()
         {
-            var jObj = new JsonObject();
-            jObj.Add("LoopSound", _loopSound);
-            jObj.Add("PlayThroughHeadphones", _playThroughHeadphones);
-            jObj.Add("soundFile", _soundFile);
-            jObj.Add("Title", Title);
-            jObj.Add("CustomPlayIcon", _customPlayIcon.ToString());
-            jObj.Add("ButtonVolume", _buttonVolume);
-            jObj.Add("ButtonColor", _buttonColor);
-            jObj.Add("FadeInSeconds", _fadeInSeconds);
-            jObj.Add("FadeOutSeconds", _fadeOutSeconds);
-            jObj.Add("FadeEnabled", _fadeEnabled);
-            jObj.Add("AutoStopSeconds", _autoStopSeconds);
-            if (_hotkeyId >= 0)
+            var jObj = new JsonObject
+            {
+                ["LoopSound"] = _loopSound,
+                ["PlayThroughHeadphones"] = _playThroughHeadphones,
+                ["soundFile"] = _soundFile,
+                ["Title"] = Title,
+                ["CustomPlayIcon"] = _customPlayIcon.ToString(),
+                ["ButtonVolume"] = _buttonVolume,
+                ["ButtonColor"] = _buttonColor,
+                ["FadeInSeconds"] = _fadeInSeconds,
+                ["FadeOutSeconds"] = _fadeOutSeconds,
+                ["FadeEnabled"] = _fadeEnabled,
+                ["AutoStopSeconds"] = _autoStopSeconds,
+            };
+            // Saved even when registration failed, so a temporarily taken hotkey isn't lost.
+            if (_hotkeyVirtualKey > 0)
             {
                 jObj.Add("HotkeyModifiers", _hotkeyModifiers);
                 jObj.Add("HotkeyVirtualKey", _hotkeyVirtualKey);
@@ -589,21 +594,17 @@ namespace MySoundBoard.Controls
             JsonNode? v;
 
             if (jObj.TryGetPropertyValue("LoopSound", out v) && v != null)
-            {
                 _loopSound = v.GetValue<bool>();
-                LoopButton.Background = _loopSound ? ActiveBrush : _unselectedBrush!;
-                LoopButton.MouseOverBackground = _loopSound ? ActiveHoverBrush : _unselectedBrushHover!;
-                FadeButton.IsEnabled = !_loopSound;
-            }
             if (jObj.TryGetPropertyValue("PlayThroughHeadphones", out v) && v != null)
-            {
                 _playThroughHeadphones = v.GetValue<bool>();
-                HeadPhoneButton.Background = _playThroughHeadphones ? ActiveBrush : _unselectedBrush!;
-                HeadPhoneButton.MouseOverBackground = _playThroughHeadphones ? ActiveHoverBrush : _unselectedBrushHover!;
-            }
+            if (jObj.TryGetPropertyValue("FadeEnabled", out v) && v != null)
+                _fadeEnabled = v.GetValue<bool>();
+            ApplyToggleStyles();
+
             if (jObj.TryGetPropertyValue("soundFile", out v) && v != null)
                 _soundFile = v.GetValue<string>() ?? string.Empty;
-                UpdateMissingFileState();
+            UpdateMissingFileState();
+
             if (jObj.TryGetPropertyValue("Title", out v) && v != null)
             {
                 Title = v.GetValue<string>();
@@ -621,234 +622,27 @@ namespace MySoundBoard.Controls
                 ButtonVolumeSlider.Value = _buttonVolume;
             }
             if (jObj.TryGetPropertyValue("ButtonColor", out v) && v != null)
-            {
-                _buttonColor = v.GetValue<string>();
-                if (!string.IsNullOrEmpty(_buttonColor))
-                {
-                    try
-                    {
-                        RootBorder.Background = new SolidColorBrush(
-                            (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(_buttonColor));
-                    }
-                    catch (FormatException) { _buttonColor = string.Empty; }
-                }
-            }
+                ApplyButtonColor(v.GetValue<string>() ?? string.Empty);
             if (jObj.TryGetPropertyValue("FadeInSeconds", out v) && v != null)
                 _fadeInSeconds = v.GetValue<double>();
             if (jObj.TryGetPropertyValue("FadeOutSeconds", out v) && v != null)
                 _fadeOutSeconds = v.GetValue<double>();
-            if (jObj.TryGetPropertyValue("FadeEnabled", out v) && v != null)
-            {
-                _fadeEnabled = v.GetValue<bool>();
-                FadeButton.Background = _fadeEnabled ? ActiveBrush : _unselectedBrush!;
-                FadeButton.MouseOverBackground = _fadeEnabled ? ActiveHoverBrush : _unselectedBrushHover!;
-            }
             if (jObj.TryGetPropertyValue("AutoStopSeconds", out v) && v != null)
                 _autoStopSeconds = v.GetValue<double>();
 
-            // Re-register hotkey if present
             if (jObj.TryGetPropertyValue("HotkeyModifiers", out v) && v != null)
                 _hotkeyModifiers = v.GetValue<uint>();
             if (jObj.TryGetPropertyValue("HotkeyVirtualKey", out v) && v != null)
                 _hotkeyVirtualKey = v.GetValue<uint>();
             if (jObj.TryGetPropertyValue("HotkeyDisplay", out v) && v != null)
                 _hotkeyDisplay = v.GetValue<string>();
-
-            if (_hotkeyVirtualKey > 0 && MainWindow.Instance?.HotkeyManager != null)
-            {
-                _hotkeyId = MainWindow.Instance.HotkeyManager.Register(
-                    _hotkeyModifiers, _hotkeyVirtualKey,
-                    () => Dispatcher.Invoke(StartPlaying));
-                UpdateHotkeyBadge();
-            }
+            RegisterHotkey();
         }
 
         private void title_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
             if (e.Source is TextBox textBox)
                 Title = textBox.Text;
-        }
-
-        // ── Inner dialog windows ──────────────────────────────────────────────
-
-        private sealed class HotkeyInputWindow : System.Windows.Window
-        {
-            private readonly System.Windows.Controls.TextBlock _label;
-
-            public uint CapturedModifiers { get; private set; }
-            public uint CapturedKey { get; private set; }
-            public bool WasAssigned { get; private set; }
-            public string HotkeyText { get; private set; } = string.Empty;
-
-            public HotkeyInputWindow()
-            {
-                Title = "Assign Hotkey";
-                Width = 300;
-                Height = 110;
-                ResizeMode = ResizeMode.NoResize;
-                WindowStartupLocation = WindowStartupLocation.CenterOwner;
-
-                var panel = new System.Windows.Controls.StackPanel
-                {
-                    VerticalAlignment = VerticalAlignment.Center,
-                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-                    Margin = new Thickness(10)
-                };
-                _label = new System.Windows.Controls.TextBlock
-                {
-                    Text = "Press a key combination…",
-                    FontSize = 13,
-                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-                    Margin = new Thickness(0, 0, 0, 6)
-                };
-                var hint = new System.Windows.Controls.TextBlock
-                {
-                    Text = "(Esc to cancel)",
-                    FontSize = 10,
-                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-                    Opacity = 0.6
-                };
-                panel.Children.Add(_label);
-                panel.Children.Add(hint);
-                Content = panel;
-
-                KeyDown += OnKeyDown;
-            }
-
-            private void OnKeyDown(object sender, KeyEventArgs e)
-            {
-                var key = e.Key == Key.System ? e.SystemKey : e.Key;
-
-                if (key == Key.Escape) { Close(); return; }
-
-                if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt
-                        or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin)
-                    return;
-
-                uint mods = 0;
-                if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
-                    mods |= HotkeyManager.MOD_CONTROL;
-                if (Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt))
-                    mods |= HotkeyManager.MOD_ALT;
-                if (Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift))
-                    mods |= HotkeyManager.MOD_SHIFT;
-
-                CapturedModifiers = mods;
-                CapturedKey = (uint)KeyInterop.VirtualKeyFromKey(key);
-                HotkeyText = FormatHotkey(mods, key);
-                WasAssigned = true;
-
-                DialogResult = true;
-                Close();
-                e.Handled = true;
-            }
-
-            private static string FormatHotkey(uint mods, Key key)
-            {
-                var parts = new List<string>();
-                if ((mods & HotkeyManager.MOD_CONTROL) != 0) parts.Add("Ctrl");
-                if ((mods & HotkeyManager.MOD_ALT) != 0) parts.Add("Alt");
-                if ((mods & HotkeyManager.MOD_SHIFT) != 0) parts.Add("Shift");
-                parts.Add(key.ToString());
-                return string.Join("+", parts);
-            }
-        }
-
-        private sealed class FadeSettingsWindow : FluentWindow
-        {
-            private readonly System.Windows.Controls.Slider _inSlider;
-            private readonly System.Windows.Controls.Slider _outSlider;
-            private readonly System.Windows.Controls.TextBlock _inLabel;
-            private readonly System.Windows.Controls.TextBlock _outLabel;
-
-            public double FadeIn => _inSlider.Value;
-            public double FadeOut => _outSlider.Value;
-
-            public FadeSettingsWindow(double fadeIn, double fadeOut)
-            {
-                Title = "Fade In / Out";
-                Width = 300;
-                Height = 200;
-                ResizeMode = ResizeMode.NoResize;
-                WindowStartupLocation = WindowStartupLocation.CenterOwner;
-
-                var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(12) };
-
-                _inLabel = new System.Windows.Controls.TextBlock { Text = $"Fade In: {fadeIn:F1}s" };
-                _inSlider = new System.Windows.Controls.Slider
-                {
-                    Minimum = 0, Maximum = 10, Value = fadeIn,
-                    TickFrequency = 0.5, IsSnapToTickEnabled = true
-                };
-                _inSlider.ValueChanged += (s, e) => _inLabel.Text = $"Fade In: {e.NewValue:F1}s";
-
-                _outLabel = new System.Windows.Controls.TextBlock { Text = $"Fade Out: {fadeOut:F1}s", Margin = new Thickness(0, 8, 0, 0) };
-                _outSlider = new System.Windows.Controls.Slider
-                {
-                    Minimum = 0, Maximum = 10, Value = fadeOut,
-                    TickFrequency = 0.5, IsSnapToTickEnabled = true
-                };
-                _outSlider.ValueChanged += (s, e) => _outLabel.Text = $"Fade Out: {e.NewValue:F1}s";
-
-                var ok = new System.Windows.Controls.Button
-                {
-                    Content = "OK", Width = 70,
-                    HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
-                    Margin = new Thickness(0, 12, 0, 0)
-                };
-                ok.Click += (s, e) => { DialogResult = true; Close(); };
-
-                panel.Children.Add(_inLabel);
-                panel.Children.Add(_inSlider);
-                panel.Children.Add(_outLabel);
-                panel.Children.Add(_outSlider);
-                panel.Children.Add(ok);
-                Content = panel;
-            }
-        }
-
-        private sealed class AutoStopWindow : FluentWindow
-        {
-            private readonly System.Windows.Controls.Slider _slider;
-            private readonly System.Windows.Controls.TextBlock _label;
-
-            public double AutoStopSeconds => _slider.Value;
-
-            public AutoStopWindow(double current)
-            {
-                Title = "Auto-Stop Timer";
-                Width = 280;
-                Height = 150;
-                ResizeMode = ResizeMode.NoResize;
-                WindowStartupLocation = WindowStartupLocation.CenterOwner;
-
-                var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(12) };
-
-                _label = new System.Windows.Controls.TextBlock
-                {
-                    Text = current == 0 ? "Auto-stop: Disabled" : $"Auto-stop: {current:F0}s"
-                };
-                _slider = new System.Windows.Controls.Slider
-                {
-                    Minimum = 0, Maximum = 300, Value = current,
-                    TickFrequency = 5
-                };
-                _slider.ValueChanged += (s, e) =>
-                    _label.Text = e.NewValue == 0 ? "Auto-stop: Disabled" : $"Auto-stop: {e.NewValue:F0}s";
-
-                var ok = new System.Windows.Controls.Button
-                {
-                    Content = "OK", Width = 70,
-                    HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
-                    Margin = new Thickness(0, 10, 0, 0)
-                };
-                ok.Click += (s, e) => { DialogResult = true; Close(); };
-
-                panel.Children.Add(_label);
-                panel.Children.Add(_slider);
-                panel.Children.Add(ok);
-                Content = panel;
-            }
         }
     }
 }

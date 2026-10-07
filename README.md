@@ -13,6 +13,7 @@ A Windows soundboard application built with WPF (.NET 8) that lets you trigger a
   - [Adding Sound Buttons](#adding-sound-buttons)
   - [Configuring a Sound Button](#configuring-a-sound-button)
   - [Playing Sounds](#playing-sounds)
+  - [Missing Sound Files](#missing-sound-files)
   - [Volume Control](#volume-control)
   - [Audio Output Devices](#audio-output-devices)
   - [Saving and Loading Soundboards](#saving-and-loading-soundboards)
@@ -26,24 +27,28 @@ A Windows soundboard application built with WPF (.NET 8) that lets you trigger a
 
 - Trigger audio clips (MP3, WAV, OGG) from a grid of customizable buttons
 - Start and stop individual sounds independently (stopping resets to the beginning)
+- Per-button play mode — click to start/stop, restart on every press, or hold to play
 - Gapless looping — loop any sound continuously until manually stopped
 - Dual audio output — play through speakers and a virtual mic simultaneously
 - Per-button fade in and fade out with configurable durations (0–10 s)
 - Fade toggle button — enable or disable fade per button without losing your configured durations
 - Per-button volume slider for independent level control on each tile
-- Configurable global hotkeys — assign a key combination to any button to trigger it from anywhere
+- Configurable global hotkeys — assign a key combination to any button to trigger it from anywhere, plus a global Stop All hotkey
 - Auto-stop timer — optionally stop a sound after a set number of seconds
+- Trim — choose where each sound starts and ends, without editing the file
 - Per-button background color for visual organization
 - Per-button custom icons chosen from a built-in icon library
 - Drag-and-drop reordering of buttons within the grid
+- Drag audio files or whole folders from Explorer onto the board, or add several at once with File > Add Sounds
 - Duplicate button — copy a button including all its settings
 - Search/filter bar to quickly find buttons by label
 - Global volume slider that applies in real time to all active sounds
 - Visual playback progress indicator on each button
 - System tray icon — minimize to tray; stop all sounds or exit from the tray menu
-- Create, save, load, and delete multiple named soundboard layouts (stored as JSON)
+- Create, save, load, and delete multiple named soundboard layouts (stored as JSON); the last board reopens at startup
+- Missing sound files are flagged and can be relinked in one go when a folder has moved
 - Alphabetical sort for your button grid
-- Light and Dark theme support (Windows Fluent design)
+- Light and Dark theme support (Windows Fluent design); theme, window size and position are remembered
 
 ---
 
@@ -88,6 +93,12 @@ A Windows soundboard application built with WPF (.NET 8) that lets you trigger a
 
 Click the **+** button (always the last tile in the grid) to add a new blank sound button. You can add as many buttons as you need.
 
+To add many sounds at once:
+
+- **Drag audio files or folders from Explorer** onto the board. Each supported file becomes a new button, named after the file. Dropping onto an existing tile inserts the new buttons right after it; dropping on empty space adds them at the end. Folders contribute the audio files directly inside them (not subfolders), in name order.
+- Use **File > Add Sounds…** (Ctrl+O) and select several files.
+- In a button's file picker (the pencil), select several files: the first goes on that button and the rest are added after it.
+
 Use the **search bar** at the top of the window to filter visible buttons by their label — useful on large boards.
 
 ### Configuring a Sound Button
@@ -109,7 +120,11 @@ Each button has a row of small action icons along the bottom:
 |--------|-------------|
 | Rename | Focuses the title field so you can type a new name. |
 | Set Color | Applies a background tint to the tile for visual grouping. |
+| Locate Sound File… | Points the button at a different file while keeping its name and all its settings. Useful after moving or renaming a sound (see [Missing Sound Files](#missing-sound-files)). |
+| Play Mode | **Click to Start / Stop** (default): press to play, press again to stop. **Restart on Every Press**: each press starts the sound over from the beginning. **Hold to Play**: the sound plays only while you hold the mouse button (or the hotkey) down. |
 | Set Hotkey | Assigns a global key combination (e.g., Ctrl+Alt+1) that starts or stops this button from anywhere on your desktop. If another application already owns the combination when a board loads, you'll be told which ones, and the hotkey badge is shown struck through; the hotkey is kept with the board so it works again once it's free. |
+| Clear Hotkey | Removes the button's hotkey. |
+| Trim… | Choose where the sound starts and ends (in 0.1 s steps) without editing the file — handy for clips with silence or extra material at either end. Looping repeats only the trimmed part, and fade-out is timed to the trimmed end. |
 | Fade In / Out | Opens a slider dialog to set the fade-in and fade-out durations (0–10 s). These values are saved even when the Fade toggle is off. |
 | Auto-Stop Timer | Stops playback automatically after a set number of seconds (0–300). Useful for sounds you want to cap at a fixed length regardless of file duration. |
 | Duplicate | Creates a copy of the button with all its settings (hotkeys are stripped since they must be unique). |
@@ -123,7 +138,15 @@ You can also **drag and drop** buttons to reorder them within the grid.
 - While playing, the button icon switches to a **stop** symbol and a progress bar fills across the button face.
 - **Click again** to stop. Stopping always resets the sound, so the next click plays it from the beginning.
 - When a sound finishes naturally it resets to the beginning. If loop mode is on, it keeps playing seamlessly.
-- Press **Esc** in the window, click **Stop All**, or use **Stop All Sounds** in the tray menu to stop everything at once.
+- The **Play Mode** option (right-click) changes what a press does — see the table above. Hover over the play button to see which mode it's in.
+
+To stop everything at once, press **Esc** while the window is focused, click **Stop All**, or use **Stop All Sounds** in the tray menu. To stop everything from inside a game or call, set a global shortcut with **Tools > Set Stop All Hotkey…** (remove it again with **Tools > Clear Stop All Hotkey**).
+
+### Missing Sound Files
+
+If a button's sound file has been moved, renamed or deleted, its play button is dimmed and its tooltip shows the missing path. Click it and MySoundBoard offers to let you locate the file. If you pick a file in a different folder, any other buttons whose sounds are missing from the same old folder are relinked automatically when files with the same names exist in the new one — so moving a whole sound folder only takes one fix.
+
+The check is repeated each time the window regains focus, so files that come back (for example, a reconnected USB drive) are picked up without restarting. A missing file never opens a dialog from a hotkey; the press is simply ignored.
 
 ### Volume Control
 
@@ -153,12 +176,14 @@ Use the **File** menu to manage soundboard layouts:
 
 If you have unsaved changes, MySoundBoard asks whether to save them before you create a new board, load another one, or exit.
 
+The board you had open when you closed MySoundBoard is reopened automatically the next time it starts. If a board file is damaged (for example, hand-edited JSON with a typo), loading it shows an error and leaves your current board untouched.
+
 Soundboard JSON files can be copied between machines as long as the audio file paths are still valid on the target machine.
 
 ### Sorting and Themes
 
 - **Tools > Sort** — sorts all buttons alphabetically by their label.
-- **Tools > Theme > Light / Dark** — switches the application between a light and dark Fluent UI theme.
+- **Tools > Theme > Light / Dark** — switches the application between a light and dark Fluent UI theme. Your choice is remembered, along with the window size and position.
 
 ---
 
@@ -170,13 +195,15 @@ MySoundBoard is a WPF (.NET 8) application using the [WPF-UI](https://github.com
 
 **Fade** — fade in is applied immediately on playback start via NAudio's volume ramp. Fade out is triggered by the progress timer (below) once the playback position reaches `trackLength - fadeOutSeconds`, ramping the volume down before the clip ends. The auto-stop limit is checked on the same tick. Both are suppressed when loop mode is active or when the fade toggle is off.
 
-**Progress tracking** — a `DispatcherTimer` ticks every 100 ms while a sound is playing. It reads the current playback position from `AudioFileReader.CurrentTime` and updates the width of a fill rectangle overlaid on the play button, creating a visual progress bar.
+**Progress tracking** — a `DispatcherTimer` ticks every 100 ms while a sound is playing. It reads the playback position within the trimmed region and updates the width of a fill rectangle overlaid on the play button, creating a visual progress bar.
 
-**Hotkeys** — global hotkeys are registered with the Windows `RegisterHotKey` API via a `HotkeyManager`. Each button registers its assigned key combination on load and unregisters it on delete or reassignment. Hotkeys work even when the app is minimized to the system tray.
+**Hotkeys** — global hotkeys are registered with the Windows `RegisterHotKey` API via a `HotkeyManager` (with `MOD_NOREPEAT`, so holding a key fires once). Each button registers its key combination after its board has finished loading and unregisters it on delete or reassignment. Hotkeys work even when the app is minimized to the system tray. Windows only reports the key press, so **Hold to Play** via a hotkey polls the key state every 30 ms to notice the release.
 
-**Persistence** — each `SoundBoardButton` implements `Serialize()` / `Deserialized()` methods that convert its state to/from a `JsonObject`. The main window collects these objects into a `JsonArray` on save and reconstructs buttons from them on load.
+**Persistence** — each `SoundBoardButton` implements `Serialize()` / `Deserialize()` to convert its state to and from a `JsonObject`. The main window collects these into a `JsonArray` on save. On load, every button is built first and the grid is only replaced if they all succeed, so a damaged file can't leave a half-loaded board. App-wide settings (devices, volume, theme, window placement, last board, Stop All hotkey) live in `%APPDATA%\MySoundBoard\settings.json`. Both files are written to a temporary file and then renamed, so a crash mid-save can't corrupt them.
 
-**Loop** — looping is gapless: a `LoopingSampleProvider` sits in the audio chain and rewinds the file the moment it runs out, so the output buffer never drains between repeats. Toggling loop while a sound plays takes effect at the next end of file.
+**Loop and trim** — looping is gapless: a `LoopingSampleProvider` sits in the audio chain and plays only the trimmed region of the file, rewinding to the region's start the moment it reaches the end so the output buffer never drains between repeats. Toggling loop while a sound plays takes effect at the next end of the region.
+
+**Structure** — `SoundBoardButton` doesn't reference the main window directly; it talks to its board through the `ISoundBoardHost` interface (volume, output devices, hotkey registration, adding/moving/removing buttons). `MainWindow` implements it, and the tests use a lightweight fake, so buttons can be tested without the whole window.
 
 ---
 

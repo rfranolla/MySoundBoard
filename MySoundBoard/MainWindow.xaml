@@ -9,10 +9,12 @@
     <ui:FluentWindow.InputBindings>
         <KeyBinding Gesture="Ctrl+N" Command="{x:Static ApplicationCommands.New}"/>
         <KeyBinding Gesture="Ctrl+S" Command="{x:Static ApplicationCommands.Save}"/>
+        <KeyBinding Gesture="Ctrl+O" Command="{x:Static ApplicationCommands.Open}"/>
     </ui:FluentWindow.InputBindings>
     <ui:FluentWindow.CommandBindings>
         <CommandBinding Command="ApplicationCommands.New" Executed="NewMenuItem_Click"/>
         <CommandBinding Command="ApplicationCommands.Save" Executed="SaveMenuItem_Click"/>
+        <CommandBinding Command="ApplicationCommands.Open" Executed="AddSoundsMenuItem_Click"/>
     </ui:FluentWindow.CommandBindings>
     <Grid>
         <Grid.RowDefinitions>
@@ -40,21 +42,25 @@
                     <ui:MenuItem Header="_Save" InputGestureText="Ctrl+S" Icon="{ui:SymbolIcon Symbol=Save24}" Click="SaveMenuItem_Click"/>
                     <ui:MenuItem Header="_Load" x:Name="LoadMenuItem" Icon="{ui:SymbolIcon Symbol=ArrowDownload24}"/>
                     <Separator/>
+                    <ui:MenuItem Header="_Add Sounds…" InputGestureText="Ctrl+O" Icon="{ui:SymbolIcon Symbol=Add24}" Click="AddSoundsMenuItem_Click"/>
+                    <Separator/>
                     <ui:MenuItem Header="_Delete Current Board…" x:Name="DeleteBoardMenuItem" Icon="{ui:SymbolIcon Symbol=Delete20}" Click="DeleteBoardMenuItem_Click"/>
                     <ui:MenuItem Header="Open Boards _Folder" Icon="{ui:SymbolIcon Symbol=FolderOpen24}" Click="OpenBoardsFolderMenuItem_Click"/>
                     <Separator/>
                     <ui:MenuItem Header="E_xit" Icon="{ui:SymbolIcon Symbol=ArrowExit20}" Click="ExitMenuItem_Click"/>
                 </ui:MenuItem>
-                <ui:MenuItem Header="_Tools">
+                <ui:MenuItem Header="_Tools" SubmenuOpened="ToolsMenu_SubmenuOpened">
                     <ui:MenuItem Header="Sort" Icon="{ui:SymbolIcon Symbol=ArrowSort24}" Click="SortMenuItem_Click"/>
+                    <ui:MenuItem x:Name="StopAllHotkeyMenuItem" Header="Set Stop All _Hotkey…" Icon="{ui:SymbolIcon Symbol=Keyboard24}" Click="SetStopAllHotkeyMenuItem_Click"/>
+                    <ui:MenuItem x:Name="ClearStopAllHotkeyMenuItem" Header="Clear Stop All Hotkey" Click="ClearStopAllHotkeyMenuItem_Click"/>
                     <Separator/>
                     <ui:MenuItem Header="_Theme" Icon="{ui:SymbolIcon Symbol=List24}">
                         <ui:MenuItem x:Name="DayMenuItem" Icon="{ui:SymbolIcon Symbol=WeatherSunny24}" Header="_Light" IsCheckable="True" Click="DayMenuItem_Click"/>
-                        <ui:MenuItem x:Name="NightMenuItem" Icon="{ui:SymbolIcon Symbol=DarkTheme24}" Header="_Dark" IsCheckable="True" IsChecked="True" Click="NightMenuItem_Click"/>
+                        <ui:MenuItem x:Name="NightMenuItem" Icon="{ui:SymbolIcon Symbol=DarkTheme24}" Header="_Dark" IsCheckable="True" Click="NightMenuItem_Click"/>
                     </ui:MenuItem>
                 </ui:MenuItem>
             </Menu>
-            <ui:Button Grid.Column="2"
+            <ui:Button Grid.Column="2" x:Name="StopAllButton"
                        Content="Stop All" Appearance="Danger"
                        Icon="{ui:SymbolIcon Symbol=Stop24}"
                        Margin="4,2" Padding="8,4"
@@ -75,7 +81,9 @@
                     TextChanged="SearchBox_TextChanged"/>
 
         <!-- Sound button grid -->
-        <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <!-- Transparent background so drops on empty space still hit the ScrollViewer -->
+        <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      Background="Transparent" AllowDrop="True" DragOver="Grid_DragOver" Drop="Grid_Drop">
             <ItemsControl x:Name="SoundBoardGrid" Margin="4">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>

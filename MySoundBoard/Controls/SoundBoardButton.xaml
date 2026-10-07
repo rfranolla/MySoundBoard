@@ -11,13 +11,23 @@
             PreviewMouseLeftButtonDown="RootBorder_PreviewMouseLeftButtonDown"
             MouseMove="RootBorder_MouseMove"
             DragEnter="RootBorder_DragEnter"
+            DragOver="RootBorder_DragOver"
             DragLeave="RootBorder_DragLeave"
             Drop="RootBorder_Drop">
         <Border.ContextMenu>
-            <ContextMenu>
+            <ContextMenu Opened="ContextMenu_Opened">
                 <MenuItem Header="Rename"          Click="RenameMenuItem_Click"/>
                 <MenuItem Header="Set Color"        Click="SetColorMenuItem_Click"/>
+                <MenuItem Header="Locate Sound File…" Click="LocateMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="Play Mode">
+                    <MenuItem x:Name="ToggleModeMenuItem"  Header="Click to Start / Stop" IsCheckable="True" Click="PlayModeMenuItem_Click" Tag="Toggle"/>
+                    <MenuItem x:Name="RestartModeMenuItem" Header="Restart on Every Press" IsCheckable="True" Click="PlayModeMenuItem_Click" Tag="Restart"/>
+                    <MenuItem x:Name="HoldModeMenuItem"    Header="Hold to Play"          IsCheckable="True" Click="PlayModeMenuItem_Click" Tag="Hold"/>
+                </MenuItem>
                 <MenuItem Header="Set Hotkey"       Click="SetHotkeyMenuItem_Click"/>
+                <MenuItem x:Name="ClearHotkeyMenuItem" Header="Clear Hotkey" Click="ClearHotkeyMenuItem_Click"/>
+                <MenuItem Header="Trim…"            Click="TrimMenuItem_Click"/>
                 <MenuItem Header="Fade In / Out"    Click="FadeMenuItem_Click"/>
                 <MenuItem Header="Auto-Stop Timer"  Click="AutoStopMenuItem_Click"/>
                 <Separator/>
@@ -58,7 +68,10 @@
             <Grid Grid.Row="1" Grid.ColumnSpan="5" Margin="1,0,1,0">
                 <ui:Button x:Name="PlayButton" AutomationProperties.Name="Play or stop" Icon="{ui:SymbolIcon Play48}" FontSize="80"
                            HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                           Click="PlayButton_Click"/>
+                           Click="PlayButton_Click"
+                           PreviewMouseLeftButtonDown="PlayButton_PreviewMouseLeftButtonDown"
+                           PreviewMouseLeftButtonUp="PlayButton_PreviewMouseLeftButtonUp"
+                           LostMouseCapture="PlayButton_LostMouseCapture"/>
                 <Rectangle x:Name="PlaybackFillRect"
                            HorizontalAlignment="Left" VerticalAlignment="Stretch"
                            Width="0" IsHitTestVisible="False"

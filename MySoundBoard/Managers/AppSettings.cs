@@ -1,3 +1,4 @@
+using MySoundBoard.Utilities;
 using System.IO;
 using System.Text.Json;
 
@@ -9,9 +10,18 @@ namespace MySoundBoard.Managers
         public string HeadphoneDeviceName { get; set; } = string.Empty;
         public double GlobalVolume { get; set; } = 100;
 
-        private static string SettingsPath => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MySoundBoard", "settings.json");
+        /// <summary>"Light" or "Dark".</summary>
+        public string Theme { get; set; } = "Dark";
+
+        /// <summary>Last normal (un-maximized) window bounds; null until the window has been closed once.</summary>
+        public WindowBounds? Window { get; set; }
+
+        /// <summary>Board reopened at startup; empty when the last session ended on an unsaved board.</summary>
+        public string LastBoardPath { get; set; } = string.Empty;
+
+        public HotkeySetting? StopAllHotkey { get; set; }
+
+        private static string SettingsPath => AppPaths.SettingsFile;
 
         public static AppSettings Load()
         {
@@ -36,5 +46,21 @@ namespace MySoundBoard.Managers
             }
             catch { }
         }
+    }
+
+    public class WindowBounds
+    {
+        public double Left { get; set; }
+        public double Top { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
+        public bool Maximized { get; set; }
+    }
+
+    public class HotkeySetting
+    {
+        public uint Modifiers { get; set; }
+        public uint VirtualKey { get; set; }
+        public string Display { get; set; } = string.Empty;
     }
 }

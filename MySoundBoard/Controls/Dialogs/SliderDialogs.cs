@@ -51,6 +51,54 @@ namespace MySoundBoard.Controls.Dialogs
         }
     }
 
+    /// <summary>Picks the part of a sound to play. An end at the file's length means "no end trim".</summary>
+    internal sealed class TrimWindow : FluentWindow
+    {
+        private const double MinRegionSeconds = 0.1;
+
+        private readonly Slider _startSlider;
+        private readonly Slider _endSlider;
+        private readonly double _duration;
+
+        public double TrimStart => _startSlider.Value;
+        /// <summary>0 when the end slider sits at the end of the file.</summary>
+        public double TrimEnd => _endSlider.Value >= _duration - 0.05 ? 0 : _endSlider.Value;
+
+        public TrimWindow(double durationSeconds, double trimStart, double trimEnd)
+        {
+            _duration = durationSeconds;
+            Title = "Trim Sound";
+            Width = 340;
+            Height = 210;
+            ResizeMode = ResizeMode.NoResize;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+            double end = trimEnd > 0 ? Math.Min(trimEnd, durationSeconds) : durationSeconds;
+            double start = Math.Clamp(trimStart, 0, Math.Max(0, end - MinRegionSeconds));
+
+            var panel = new StackPanel { Margin = new Thickness(12) };
+            _startSlider = DialogControls.AddLabelledSlider(panel, start, durationSeconds, 0.1,
+                v => $"Start: {v:F1}s", topMargin: 0);
+            _endSlider = DialogControls.AddLabelledSlider(panel, end, durationSeconds, 0.1,
+                v => v >= durationSeconds - 0.05 ? $"End: {v:F1}s (end of file)" : $"End: {v:F1}s", topMargin: 8);
+
+            // Keep at least a sliver of sound between the two handles.
+            _startSlider.ValueChanged += (s, e) =>
+            {
+                if (_endSlider.Value - e.NewValue < MinRegionSeconds)
+                    _endSlider.Value = Math.Min(durationSeconds, e.NewValue + MinRegionSeconds);
+            };
+            _endSlider.ValueChanged += (s, e) =>
+            {
+                if (e.NewValue - _startSlider.Value < MinRegionSeconds)
+                    _startSlider.Value = Math.Max(0, e.NewValue - MinRegionSeconds);
+            };
+
+            DialogControls.AddOkButton(panel, this);
+            Content = panel;
+        }
+    }
+
     internal static class DialogControls
     {
         /// <summary>Adds a caption that tracks the slider's value, followed by the slider itself.</summary>

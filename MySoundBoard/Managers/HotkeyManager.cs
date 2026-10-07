@@ -3,7 +3,14 @@ using System.Windows.Interop;
 
 namespace MySoundBoard.Managers
 {
-    public class HotkeyManager : IDisposable
+    public interface IHotkeyRegistrar
+    {
+        /// <summary>Registers a global hotkey. Returns its id, or -1 if the combination is already taken.</summary>
+        int Register(uint modifiers, uint vk, Action callback);
+        void Unregister(int id);
+    }
+
+    public class HotkeyManager : IHotkeyRegistrar, IDisposable
     {
         [DllImport("user32.dll")]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -11,12 +18,17 @@ namespace MySoundBoard.Managers
         [DllImport("user32.dll")]
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
+        [DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int vKey);
+
         private const int WM_HOTKEY = 0x0312;
 
         public const uint MOD_NONE    = 0x0000;
         public const uint MOD_ALT     = 0x0001;
         public const uint MOD_CONTROL = 0x0002;
         public const uint MOD_SHIFT   = 0x0004;
+        // Holding the keys fires once instead of auto-repeating, so a held toggle hotkey doesn't flicker.
+        private const uint MOD_NOREPEAT = 0x4000;
 
         private HwndSource? _hwndSource;
         private readonly Dictionary<int, Action> _hotkeys = new();
@@ -28,11 +40,14 @@ namespace MySoundBoard.Managers
             _hwndSource?.AddHook(WndProc);
         }
 
+        /// <summary>True while the key is physically held, whichever window has focus.</summary>
+        public static bool IsKeyDown(uint vk) => (GetAsyncKeyState((int)vk) & 0x8000) != 0;
+
         public int Register(uint modifiers, uint vk, Action callback)
         {
             if (_hwndSource == null) return -1;
             int id = _nextId++;
-            if (RegisterHotKey(_hwndSource.Handle, id, modifiers, vk))
+            if (RegisterHotKey(_hwndSource.Handle, id, modifiers | MOD_NOREPEAT, vk))
             {
                 _hotkeys[id] = callback;
                 return id;
@@ -63,7 +78,9 @@ namespace MySoundBoard.Managers
             if (_hwndSource == null) return;
             foreach (var id in _hotkeys.Keys.ToList())
                 UnregisterHotKey(_hwndSource.Handle, id);
+            _hotkeys.Clear();
             _hwndSource.RemoveHook(WndProc);
+            _hwndSource = null;
         }
     }
 }

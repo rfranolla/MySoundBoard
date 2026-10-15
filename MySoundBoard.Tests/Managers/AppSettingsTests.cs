@@ -155,6 +155,45 @@ namespace MySoundBoard.Tests.Managers
         }
 
         [TestMethod]
+        public void SettingsPath_IsRedirectedAwayFromRealAppData()
+        {
+            var realAppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            Assert.IsFalse(GetSettingsPath().StartsWith(realAppData, StringComparison.OrdinalIgnoreCase),
+                "Tests must never touch the user's real settings file");
+        }
+
+        [TestMethod]
+        public void SaveAndLoad_RoundTrip_PreservesThemeWindowBoardAndStopAllHotkey()
+        {
+            new AppSettings
+            {
+                Theme = "Light",
+                Window = new WindowBounds { Left = 10, Top = 20, Width = 800, Height = 600, Maximized = true },
+                LastBoardPath = @"C:\boards\gig.json",
+                StopAllHotkey = new HotkeySetting { Modifiers = 3, VirtualKey = 0x7B, Display = "Ctrl+Alt+F12" }
+            }.Save();
+
+            var loaded = AppSettings.Load();
+
+            Assert.AreEqual("Light", loaded.Theme);
+            Assert.AreEqual(800, loaded.Window!.Width);
+            Assert.IsTrue(loaded.Window.Maximized);
+            Assert.AreEqual(@"C:\boards\gig.json", loaded.LastBoardPath);
+            Assert.AreEqual(0x7Bu, loaded.StopAllHotkey!.VirtualKey);
+            Assert.AreEqual("Ctrl+Alt+F12", loaded.StopAllHotkey.Display);
+        }
+
+        [TestMethod]
+        public void DefaultValues_DarkThemeNoWindowNoBoardNoStopAllHotkey()
+        {
+            var settings = new AppSettings();
+            Assert.AreEqual("Dark", settings.Theme);
+            Assert.IsNull(settings.Window);
+            Assert.AreEqual(string.Empty, settings.LastBoardPath);
+            Assert.IsNull(settings.StopAllHotkey);
+        }
+
+        [TestMethod]
         public void Save_OverwritesPreviousSave()
         {
             new AppSettings { GlobalVolume = 50.0 }.Save();

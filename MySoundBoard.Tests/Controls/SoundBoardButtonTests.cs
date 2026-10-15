@@ -12,13 +12,122 @@ namespace MySoundBoard.Tests.Controls
 
         private void Skip() => WpfTestHost.SkipIfUnavailable();
 
+        // No hotkey registrar, so hotkeys never register unless a test supplies one.
+        private static readonly FakeSoundBoardHost Host = new();
+
+        private static JsonObject WithHotkey(JsonObject obj, uint modifiers = 2u, uint vk = 0x70u, string display = "Ctrl+F1")
+        {
+            obj["HotkeyModifiers"] = modifiers;
+            obj["HotkeyVirtualKey"] = vk;
+            obj["HotkeyDisplay"] = display;
+            return obj;
+        }
+
+        // ── Hotkey activation ─────────────────────────────────────────────────
+
+        [TestMethod]
+        public void Deserialize_DoesNotRegisterHotkey_UntilActivated()
+        {
+            Skip();
+            var registrar = new FakeHotkeyRegistrar();
+            var host = new FakeSoundBoardHost { Hotkeys = registrar };
+
+            WpfTestHost.Invoke(() =>
+            {
+                var btn = new SoundBoardButton(host, WithHotkey(BuildJsonObject()));
+                Assert.AreEqual(0, registrar.Registered.Count, "Building a button must not take a global hotkey");
+
+                btn.ActivateHotkey();
+                Assert.AreEqual(1, registrar.Registered.Count);
+                Assert.IsFalse(btn.HasUnregisteredHotkey);
+
+                btn.Cleanup();
+                Assert.AreEqual(0, registrar.Registered.Count, "Cleanup must release the hotkey");
+            });
+        }
+
+        [TestMethod]
+        public void ActivateHotkey_WhenTaken_KeepsHotkeyAndReportsIt()
+        {
+            Skip();
+            var registrar = new FakeHotkeyRegistrar();
+            registrar.Taken.Add((2u, 0x70u));
+            var host = new FakeSoundBoardHost { Hotkeys = registrar };
+
+            var (json, unregistered) = WpfTestHost.Invoke(() =>
+            {
+                var btn = new SoundBoardButton(host, WithHotkey(BuildJsonObject()));
+                btn.ActivateHotkey();
+                return (btn.Serialize(), btn.HasUnregisteredHotkey);
+            });
+
+            Assert.IsTrue(unregistered);
+            Assert.AreEqual(0x70u, json["HotkeyVirtualKey"]!.GetValue<uint>());
+        }
+
+        // ── Play mode and trim ────────────────────────────────────────────────
+
+        [TestMethod]
+        public void Serialize_Default_PlayModeIsToggleAndNoTrim()
+        {
+            Skip();
+            var json = WpfTestHost.Invoke(() => new SoundBoardButton(Host).Serialize());
+            Assert.AreEqual("Toggle", json["PlayMode"]!.GetValue<string>());
+            Assert.AreEqual(0.0, json["TrimStartSeconds"]!.GetValue<double>());
+            Assert.AreEqual(0.0, json["TrimEndSeconds"]!.GetValue<double>());
+        }
+
+        [TestMethod]
+        [DataRow("Toggle")]
+        [DataRow("Restart")]
+        [DataRow("Hold")]
+        public void RoundTrip_PlayMode_Preserved(string mode)
+        {
+            Skip();
+            var input = BuildJsonObject();
+            input["PlayMode"] = mode;
+            Assert.AreEqual(mode, RoundTrip(input)["PlayMode"]!.GetValue<string>());
+        }
+
+        [TestMethod]
+        public void Deserialize_UnknownPlayMode_FallsBackToToggle()
+        {
+            Skip();
+            var input = BuildJsonObject();
+            input["PlayMode"] = "Teleport";
+            Assert.AreEqual("Toggle", RoundTrip(input)["PlayMode"]!.GetValue<string>());
+        }
+
+        [TestMethod]
+        public void RoundTrip_Trim_PreservedAndNegativeClampedToZero()
+        {
+            Skip();
+            var input = BuildJsonObject();
+            input["TrimStartSeconds"] = -3.0;
+            input["TrimEndSeconds"] = 4.5;
+            var result = RoundTrip(input);
+            Assert.AreEqual(0.0, result["TrimStartSeconds"]!.GetValue<double>());
+            Assert.AreEqual(4.5, result["TrimEndSeconds"]!.GetValue<double>(), 0.001);
+        }
+
+        [TestMethod]
+        public void Deserialize_WrongValueType_Throws()
+        {
+            // MainWindow relies on this to reject a damaged board before clearing the grid.
+            Skip();
+            var input = BuildJsonObject();
+            input["LoopSound"] = "yes please";
+            Assert.ThrowsException<InvalidOperationException>(
+                () => WpfTestHost.Invoke(() => { _ = new SoundBoardButton(Host, input); }));
+        }
+
         // ── Serialize shape ───────────────────────────────────────────────────
 
         [TestMethod]
         public void Serialize_ContainsAllExpectedKeys()
         {
             Skip();
-            var json = WpfTestHost.Invoke(() => new SoundBoardButton().Serialize());
+            var json = WpfTestHost.Invoke(() => new SoundBoardButton(Host).Serialize());
 
             var expected = new[]
             {
@@ -34,7 +143,7 @@ namespace MySoundBoard.Tests.Controls
         public void Serialize_DefaultValues_MatchExpected()
         {
             Skip();
-            var json = WpfTestHost.Invoke(() => new SoundBoardButton().Serialize());
+            var json = WpfTestHost.Invoke(() => new SoundBoardButton(Host).Serialize());
 
             Assert.AreEqual(false, json["LoopSound"]!.GetValue<bool>());
             Assert.AreEqual(false, json["PlayThroughHeadphones"]!.GetValue<bool>());
@@ -51,7 +160,7 @@ namespace MySoundBoard.Tests.Controls
         public void Serialize_WithoutHotkey_DoesNotIncludeHotkeyKeys()
         {
             Skip();
-            var json = WpfTestHost.Invoke(() => new SoundBoardButton().Serialize());
+            var json = WpfTestHost.Invoke(() => new SoundBoardButton(Host).Serialize());
 
             Assert.IsFalse(json.ContainsKey("HotkeyModifiers"), "Default button should not include HotkeyModifiers");
             Assert.IsFalse(json.ContainsKey("HotkeyVirtualKey"), "Default button should not include HotkeyVirtualKey");
@@ -209,7 +318,7 @@ namespace MySoundBoard.Tests.Controls
                 // FadeEnabled intentionally absent
             };
 
-            var result = WpfTestHost.Invoke(() => new SoundBoardButton(oldFormat).Serialize());
+            var result = WpfTestHost.Invoke(() => new SoundBoardButton(Host, oldFormat).Serialize());
 
             Assert.AreEqual(false, result["FadeEnabled"]!.GetValue<bool>(),
                 "FadeEnabled should default to false for old saves without the key");
@@ -227,7 +336,7 @@ namespace MySoundBoard.Tests.Controls
             };
 
             // Should not throw
-            WpfTestHost.Invoke(() => { _ = new SoundBoardButton(minimal); });
+            WpfTestHost.Invoke(() => { _ = new SoundBoardButton(Host, minimal); });
         }
 
         // ── Title property ────────────────────────────────────────────────────
@@ -238,7 +347,7 @@ namespace MySoundBoard.Tests.Controls
             Skip();
             WpfTestHost.Invoke(() =>
             {
-                var btn = new SoundBoardButton(BuildJsonObject(title: "My Sound Effect"));
+                var btn = new SoundBoardButton(Host, BuildJsonObject(title: "My Sound Effect"));
                 Assert.AreEqual("My Sound Effect", btn.Title);
             });
         }
@@ -249,7 +358,7 @@ namespace MySoundBoard.Tests.Controls
             Skip();
             WpfTestHost.Invoke(() =>
             {
-                var btn = new SoundBoardButton();
+                var btn = new SoundBoardButton(Host);
                 Assert.AreEqual(string.Empty, btn.Title);
             });
         }
@@ -257,7 +366,7 @@ namespace MySoundBoard.Tests.Controls
         // ── Helpers ───────────────────────────────────────────────────────────
 
         private JsonObject RoundTrip(JsonObject input) =>
-            WpfTestHost.Invoke(() => new SoundBoardButton(input).Serialize());
+            WpfTestHost.Invoke(() => new SoundBoardButton(Host, input).Serialize());
 
         private static JsonObject BuildJsonObject(
             bool loop = false, bool headphones = false, string soundFile = "",

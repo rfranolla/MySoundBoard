@@ -123,7 +123,7 @@ namespace MySoundBoard.Tests.Managers
         {
             SkipIfUnavailable();
             var player = CreatePlayer();
-            Assert.IsTrue(player.GetLenghtInSeconds() > 0, "Track length must be greater than zero");
+            Assert.IsTrue(player.GetLengthInSeconds() > 0, "Track length must be greater than zero");
         }
 
         [TestMethod]
@@ -139,7 +139,7 @@ namespace MySoundBoard.Tests.Managers
         {
             SkipIfUnavailable();
             var player = CreatePlayer();
-            double length = player.GetLenghtInSeconds();
+            double length = player.GetLengthInSeconds();
             if (length < 2.0)
             {
                 Assert.Inconclusive("test.mp3 is too short to test seek (need > 2 s).");
@@ -151,11 +151,20 @@ namespace MySoundBoard.Tests.Managers
         // ── PlaybackStopType ──────────────────────────────────────────────────
 
         [TestMethod]
-        public void PlaybackStopType_CanBeOverridden()
+        public void PlaybackStopType_AfterStop_IsStoppedByUser()
         {
             SkipIfUnavailable();
             var player = CreatePlayer();
-            player.PlaybackStopType = AudioPlayer.PlaybackStopTypes.PlaybackStoppedByUser;
+            player.Stop();
+            Assert.AreEqual(AudioPlayer.PlaybackStopTypes.PlaybackStoppedByUser, player.PlaybackStopType);
+        }
+
+        [TestMethod]
+        public void PlaybackStopType_AfterFadeOut_IsStoppedByUser()
+        {
+            SkipIfUnavailable();
+            var player = CreatePlayer();
+            player.BeginFadeOut(100);
             Assert.AreEqual(AudioPlayer.PlaybackStopTypes.PlaybackStoppedByUser, player.PlaybackStopType);
         }
 
@@ -178,7 +187,7 @@ namespace MySoundBoard.Tests.Managers
             SkipIfUnavailable();
             var player = new AudioPlayer(TestMp3, 1.0f, _device!);
             player.Dispose();
-            Assert.AreEqual(0.0, player.GetLenghtInSeconds(), "After dispose, length should be 0");
+            Assert.AreEqual(0.0, player.GetLengthInSeconds(), "After dispose, length should be 0");
             _player = null;
         }
 
@@ -195,24 +204,5 @@ namespace MySoundBoard.Tests.Managers
             Assert.IsFalse(fired);
         }
 
-        [TestMethod]
-        public void PlaybackResumed_EventCanBeSubscribed()
-        {
-            SkipIfUnavailable();
-            var player = CreatePlayer();
-            bool fired = false;
-            player.PlaybackResumed += () => fired = true;
-            Assert.IsFalse(fired);
-        }
-
-        [TestMethod]
-        public void PlaybackPaused_EventCanBeSubscribed()
-        {
-            SkipIfUnavailable();
-            var player = CreatePlayer();
-            bool fired = false;
-            player.PlaybackPaused += () => fired = true;
-            Assert.IsFalse(fired);
-        }
     }
 }

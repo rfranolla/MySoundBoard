@@ -5,3 +5,4 @@ obj/
 *.DotSettings.user
 /publish/
 /dist/
+*.csproj.user

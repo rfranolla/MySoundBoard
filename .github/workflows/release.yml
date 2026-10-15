@@ -24,6 +24,9 @@ jobs:
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
 
+      - name: Run tests
+        run: dotnet test MySoundBoard.sln -c Release
+
       - name: Publish app
         run: |
           if (Test-Path publish) { Remove-Item -Recurse -Force publish }

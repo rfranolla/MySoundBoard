@@ -6,18 +6,28 @@
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              mc:Ignorable="d"
              d:DesignHeight="200" d:DesignWidth="200">
-    <Border x:Name="RootBorder" Width="150" Height="160" BorderThickness="1" BorderBrush="LightGray"
+    <Border x:Name="RootBorder" Width="150" Height="160" BorderThickness="1" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
             Padding="2" CornerRadius="8" Margin="3" AllowDrop="True"
             PreviewMouseLeftButtonDown="RootBorder_PreviewMouseLeftButtonDown"
             MouseMove="RootBorder_MouseMove"
             DragEnter="RootBorder_DragEnter"
+            DragOver="RootBorder_DragOver"
             DragLeave="RootBorder_DragLeave"
             Drop="RootBorder_Drop">
         <Border.ContextMenu>
-            <ContextMenu>
+            <ContextMenu Opened="ContextMenu_Opened">
                 <MenuItem Header="Rename"          Click="RenameMenuItem_Click"/>
                 <MenuItem Header="Set Color"        Click="SetColorMenuItem_Click"/>
+                <MenuItem Header="Locate Sound File…" Click="LocateMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="Play Mode">
+                    <MenuItem x:Name="ToggleModeMenuItem"  Header="Click to Start / Stop" IsCheckable="True" Click="PlayModeMenuItem_Click" Tag="Toggle"/>
+                    <MenuItem x:Name="RestartModeMenuItem" Header="Restart on Every Press" IsCheckable="True" Click="PlayModeMenuItem_Click" Tag="Restart"/>
+                    <MenuItem x:Name="HoldModeMenuItem"    Header="Hold to Play"          IsCheckable="True" Click="PlayModeMenuItem_Click" Tag="Hold"/>
+                </MenuItem>
                 <MenuItem Header="Set Hotkey"       Click="SetHotkeyMenuItem_Click"/>
+                <MenuItem x:Name="ClearHotkeyMenuItem" Header="Clear Hotkey" Click="ClearHotkeyMenuItem_Click"/>
+                <MenuItem Header="Trim…"            Click="TrimMenuItem_Click"/>
                 <MenuItem Header="Fade In / Out"    Click="FadeMenuItem_Click"/>
                 <MenuItem Header="Auto-Stop Timer"  Click="AutoStopMenuItem_Click"/>
                 <Separator/>
@@ -56,9 +66,12 @@
 
             <!-- Play button + progress + hotkey badge -->
             <Grid Grid.Row="1" Grid.ColumnSpan="5" Margin="1,0,1,0">
-                <ui:Button x:Name="PlayButton" Icon="{ui:SymbolIcon Play48}" FontSize="80"
+                <ui:Button x:Name="PlayButton" AutomationProperties.Name="Play or stop" Icon="{ui:SymbolIcon Play48}" FontSize="80"
                            HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                           Click="PlayButton_Click"/>
+                           Click="PlayButton_Click"
+                           PreviewMouseLeftButtonDown="PlayButton_PreviewMouseLeftButtonDown"
+                           PreviewMouseLeftButtonUp="PlayButton_PreviewMouseLeftButtonUp"
+                           LostMouseCapture="PlayButton_LostMouseCapture"/>
                 <Rectangle x:Name="PlaybackFillRect"
                            HorizontalAlignment="Left" VerticalAlignment="Stretch"
                            Width="0" IsHitTestVisible="False"
@@ -82,17 +95,20 @@
 
             <!-- Action buttons -->
             <ui:Button x:Name="EditButton" Grid.Row="3" Grid.Column="0" Icon="{ui:SymbolIcon Edit20}" Padding="0"
-                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1" Click="EditButton_Click"/>
+                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1"
+                       ToolTip="Choose sound file" AutomationProperties.Name="Choose sound file" Click="EditButton_Click"/>
             <ui:Button x:Name="LoopButton" Grid.Row="3" Grid.Column="1" Icon="{ui:SymbolIcon arrowRepeatAll20}" Padding="0"
-                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1" Click="LoopButton_Click"/>
+                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1"
+                       ToolTip="Toggle loop" AutomationProperties.Name="Toggle loop" Click="LoopButton_Click"/>
             <ui:Button x:Name="HeadPhoneButton" Grid.Row="3" Grid.Column="2" Icon="{ui:SymbolIcon HeadphonesSoundWave20}" Padding="0"
-                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1" Click="HeadphoneButton_Click"/>
+                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1"
+                       ToolTip="Also play through secondary output" AutomationProperties.Name="Play through secondary output" Click="HeadphoneButton_Click"/>
             <ui:Button x:Name="FadeButton" Grid.Row="3" Grid.Column="3" Icon="{ui:SymbolIcon ArrowBidirectionalUpDown20}" Padding="0"
                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1"
-                       ToolTip="Toggle fade in/out" Click="FadeButton_Click"/>
+                       ToolTip="Toggle fade in/out" AutomationProperties.Name="Toggle fade" Click="FadeButton_Click"/>
             <ui:Button x:Name="DeleteButton" Grid.Row="3" Grid.Column="4" Icon="{ui:SymbolIcon Symbol=Delete20}" Padding="0"
                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="1"
-                       Appearance="Danger" Click="DeleteButton_Click"/>
+                       Appearance="Danger" ToolTip="Delete" AutomationProperties.Name="Delete" Click="DeleteButton_Click"/>
         </Grid>
     </Border>
 </UserControl>

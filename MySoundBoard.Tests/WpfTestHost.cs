@@ -4,10 +4,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace MySoundBoard.Tests
 {
     /// <summary>
-    /// Manages a single WPF Application + MainWindow running on a background STA thread.
-    /// Required because SoundBoardButton.Initialize() accesses MainWindow.Instance.
-    /// The MainWindow is never shown, so MainWindow_Loaded (and HotkeyManager init) never fires —
-    /// all SoundBoardButton code that touches HotkeyManager uses null-conditional operators and is safe.
+    /// Runs a single WPF Application on a background STA thread so tests can create controls.
+    /// Buttons are tested against <see cref="FakeSoundBoardHost"/>, so no MainWindow is needed here.
     /// </summary>
     internal static class WpfTestHost
     {
@@ -32,8 +30,6 @@ namespace MySoundBoard.Tests
                     {
                         ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown
                     };
-                    // Constructing MainWindow sets MainWindow.Instance, which SoundBoardButton needs.
-                    _ = new MainWindow();
                     _initialized = true;
                 }
                 catch (Exception ex)
